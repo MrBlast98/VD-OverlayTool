@@ -1,0 +1,29 @@
+name: VD OverlayTools Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/latest.yml
+            dist/VD-OverlayTools-Setup-1.0.0.exe
+            dist/VD-OverlayTools-Setup-1.0.0.exe.blockmap
+            dist/VD-OverlayTools-1.0.0.exe
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
