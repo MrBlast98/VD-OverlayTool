@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: file: https:; media-src 'self' file: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self' https:;">
+  <title>VD OverlayTools</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Cinzel:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+  <div id="titlebar">
+    <div id="titlebar-drag">
+      <span class="app-logo">◈</span>
+      <span class="app-name">VD OverlayTools</span>
+      <span class="app-tagline">An app designed to make your competitive experience easier.</span>
+    </div>
+    <div id="titlebar-controls">
+      <button onclick="window.ipc.send('minimize-window')" class="tb-btn">─</button>
+      <button onclick="window.ipc.send('maximize-window')" class="tb-btn">□</button>
+      <button onclick="window.ipc.send('close-window')" class="tb-btn close-btn">✕</button>
+    </div>
+  </div>
+
+  <div id="startup-update-overlay" class="startup-update-overlay" style="display:none;">
+    <div class="startup-update-card">
+      <div class="startup-update-label">Checking For Updates..</div>
+      <div class="startup-update-status" id="startup-update-status">Preparing...</div>
+      <div class="startup-update-progress-wrap">
+        <div class="startup-update-progress-bar" id="startup-update-progress-bar"></div>
+      </div>
+      <div class="startup-update-actions" id="startup-update-actions" style="display:none;">
+        <button class="btn primary" id="btn-startup-update-now">Update</button>
+        <button class="btn" id="btn-startup-update-later">Update Later</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs rendered by JS inside #app -->
+
+  <div id="success-message" class="success-message" style="display: none;">
+    <div class="success-content">
+      <div class="success-icon">✓</div>
+      <div class="success-text">Success! Key copied to clipboard.</div>
+    </div>
+  </div>
+
+  <div id="map-preview-modal" class="map-preview-container" style="display: none;">
+    <div class="map-preview-modal">
+      <img id="map-preview-image" src="" alt="Map preview" class="map-preview-image" />
+      <button class="map-preview-close" onclick="closeMapPreviewModal()">✕</button>
+    </div>
+  </div>
+
+  <div id="item-preview-modal" class="item-preview-container" style="display: none;">
+    <div class="item-preview-modal" role="dialog" aria-modal="true" aria-labelledby="item-preview-title">
+      <button class="item-preview-close" type="button" onclick="closeItemPreviewModal()">✕</button>
+      <div class="item-preview-visual">
+        <img id="item-preview-image" src="" alt="Item preview" class="item-preview-image" />
+      </div>
+      <div class="item-preview-copy">
+        <div class="item-preview-kicker">Item Preview</div>
+        <div id="item-preview-title" class="item-preview-title"></div>
+        <div class="item-preview-section">
+          <div class="item-preview-label">What it does</div>
+          <div id="item-preview-summary" class="item-preview-summary"></div>
+        </div>
+        <div class="item-preview-section">
+          <div class="item-preview-label">Basic information</div>
+          <div id="item-preview-detail" class="item-preview-detail"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="app" style="display: none;">
+    <nav id="sidebar">
+      <div class="sidebar-panel">
+        <div class="sidebar-kicker">Control center</div>
+        <div class="sidebar-title">Quick access</div>
+      </div>
+
+      <section class="nav-group">
+        <button class="nav-group-header" type="button">
+          <span>
+            <span class="nav-group-icon">◈</span>
+            Live overlays
+          </span>
+          <span class="nav-chevron">⌄</span>
+        </button>
+        <div class="nav-group-body">
+          <button class="nav-btn active" data-tab="dashboard"><span class="nav-icon">◌</span>Dashboard</button>
+          <button class="nav-btn" data-tab="onevone"><span class="nav-icon">⚔</span>1v1 Timer</button>
+          <button class="nav-btn" data-tab="maps"><span class="nav-icon">🗺</span>Map Overlay</button>
+          <button class="nav-btn nav-premium" data-tab="fourvone"><span class="nav-icon">⚡</span>Scrim Overlay</button>
+          <button class="nav-btn nav-premium" data-tab="winstreak"><span class="nav-icon">◍</span>Winstreak Overlay</button>
+          <button class="nav-btn" data-tab="ladder"><span class="nav-icon">★</span>Ladder Overlay</button>
+
+        </div>
+      </section>
+
+      <section class="nav-group">
+        <button class="nav-group-header" type="button">
+          <span>
+            <span class="nav-group-icon">⚑</span>
+            Stats
+          </span>
+          <span class="nav-chevron">⌄</span>
+        </button>
+        <div class="nav-group-body">
+          <button class="nav-btn" data-tab="stats"><span class="nav-icon">◍</span>Winstreak Stats</button>
+          <button class="nav-btn" data-tab="winstreak-builds"><span class="nav-icon">✦</span>Winstreak Builds</button>
+        </div>
+      </section>
+
+      <section class="nav-group">
+        <button class="nav-group-header" type="button">
+          <span>
+            <span class="nav-group-icon">⌂</span>
+            Game Info
+          </span>
+          <span class="nav-chevron">⌄</span>
+        </button>
+        <div class="nav-group-body">
+          <button class="nav-btn" data-tab="game-info"><span class="nav-icon">✦</span>Wiki</button>
+          <section class="nav-group subgroup">
+            <button class="nav-group-header" type="button" data-tab="game-info-killers">
+              <span>
+                <span class="nav-group-icon">⚔</span>
+                Killers
+              </span>
+              <span class="nav-chevron">⌄</span>
+            </button>
+            <div class="nav-group-body">
+              <section class="nav-group subgroup">
+                <button class="nav-group-header" type="button" data-tab="game-info-killer-perks">
+                  <span>
+                    <span class="nav-group-icon">✦</span>
+                    Perks
+                  </span>
+                  <span class="nav-chevron">⌄</span>
+                </button>
+                <div class="nav-group-body">
+                  <!-- Perks header acts as the tab target now -->
+                </div>
+              </section>
+            </div>
+          </section>
+          <section class="nav-group subgroup">
+            <button class="nav-group-header" type="button" data-tab="game-info-survivors">
+              <span>
+                <span class="nav-group-icon">☰</span>
+                Survivors
+              </span>
+              <span class="nav-chevron">⌄</span>
+            </button>
+            <div class="nav-group-body">
+              <section class="nav-group subgroup">
+                <button class="nav-group-header" type="button" data-tab="game-info-survivor-perks">
+                  <span>
+                    <span class="nav-group-icon">✦</span>
+                    Survivor Perks
+                  </span>
+                  <span class="nav-chevron">⌄</span>
+                </button>
+                <div class="nav-group-body">
+                  <!-- Survivor Perk header is the tab now -->
+                </div>
+              </section>
+            </div>
+          </section>
+          <button class="nav-btn" data-tab="game-info-maps"><span class="nav-icon">🗺</span>Maps</button>
+          <button class="nav-btn" data-tab="game-info-1v1-map-starts"><span class="nav-icon">⚑</span>1v1 Map Starts</button>
+        </div>
+      </section>
+
+      <section class="nav-group">
+        <button class="nav-group-header" type="button">
+          <span>
+            <span class="nav-group-icon">✦</span>
+            Visual design
+          </span>
+          <span class="nav-chevron">⌄</span>
+        </button>
+        <div class="nav-group-body">
+          <button class="nav-btn" data-tab="backgrounds"><span class="nav-icon">◧</span>Backgrounds</button>
+          <button class="nav-btn" data-tab="fonts"><span class="nav-icon">Aa</span>Fonts</button>
+        </div>
+      </section>
+
+      <section class="nav-group">
+        <button class="nav-group-header" type="button">
+          <span>
+            <span class="nav-group-icon">⚙</span>
+            Settings
+          </span>
+          <span class="nav-chevron">⌄</span>
+        </button>
+        <div class="nav-group-body">
+          <button class="nav-btn" data-tab="settings"><span class="nav-icon">⚙</span>Preferences</button>
+          <button class="nav-btn" data-tab="credits"><span class="nav-icon">✦</span>Credits</button>
+        </div>
+      </section>
+    </nav>
+
+    <main id="content">
+      <!-- Tabs injected by JS -->
+    </main>
+  </div>
+
+  <script src="app.bundle.js"></script>
+</body>
+</html>

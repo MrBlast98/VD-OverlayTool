@@ -1,0 +1,4688 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: file: https:; media-src 'self' file: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self' https:;">
+  <title>Overlay</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700;800&family=JetBrains+Mono:wght@400;700&family=Cinzel:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* Visual system: spacing, radii, palette, and scale */
+      --ui-scale: 1; /* change to 0.75–1.5 for different output resolutions */
+      --space-xs: 4px;
+      --space-sm: 8px;
+      --space-md: 12px;
+      --space-lg: 16px;
+      --radius-sm: 6px;
+      --radius: 10px;
+      --radius-lg: 14px;
+
+      /* Palette (2–3 accents + neutrals) */
+      --bg-rgb: 8, 12, 18;
+      --overlay-bg-alpha: 0.14;
+      --overlay-bg: rgba(var(--bg-rgb), var(--overlay-bg-alpha));
+      --neutral-1: #0b0d10;
+      --neutral-2: rgba(255,255,255,0.04);
+      --accent-1: #7f95ff; /* primary */
+      --accent-2: #9b83ff; /* secondary */
+      --accent-3: #76c5b6; /* helper */
+      --warn: #ffb37e;
+      --danger: #ff8da1;
+
+      --text: #f2f6f7;
+      --overlay-text: #ffffff;
+      --muted: rgba(242,246,247,0.64);
+      --muted-2: rgba(242,246,247,0.38);
+
+      --shadow-soft: 0 10px 30px rgba(0,0,0,0.36);
+      --shadow-elev: 0 22px 48px rgba(0,0,0,0.44);
+
+      --transition-fast: 160ms cubic-bezier(.22,.9,.28,1);
+      --transition-med: 240ms cubic-bezier(.22,.9,.28,1);
+      --gold-1: #ffd36b;
+      --gold-2: #ffb84d;
+      --silver-1: #d7e3ff;
+      --silver-2: #aab8ff;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'Syne', sans-serif;
+      color: var(--overlay-text);
+    }
+
+    body {
+      opacity: 0;
+      transform: translateY(8px) scale(0.985);
+      animation: overlayEnter 320ms ease forwards;
+    }
+
+    @keyframes overlayEnter {
+      to {
+        opacity: 1;
+        transform: none;
+      }
+    }
+
+    #overlay-root {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: stretch;
+      justify-content: stretch;
+      padding: 0;
+      position: relative;
+    }
+
+    /* Window resize handles */
+    .resize-handle {
+      position: absolute;
+      z-index: 1000;
+    }
+    .resize-handle.edge-n { top: -8px; left: 0; right: 0; height: 16px; cursor: ns-resize; }
+    .resize-handle.edge-s { bottom: -8px; left: 0; right: 0; height: 16px; cursor: ns-resize; }
+    .resize-handle.edge-e { top: 0; right: -8px; width: 16px; bottom: 0; cursor: ew-resize; }
+    .resize-handle.edge-w { top: 0; left: -8px; width: 16px; bottom: 0; cursor: ew-resize; }
+    .resize-handle.corner-ne { top: -8px; right: -8px; width: 16px; height: 16px; cursor: nesw-resize; }
+    .resize-handle.corner-nw { top: -8px; left: -8px; width: 16px; height: 16px; cursor: nwse-resize; }
+    .resize-handle.corner-se { bottom: -8px; right: -8px; width: 16px; height: 16px; cursor: nwse-resize; }
+    .resize-handle.corner-sw { bottom: -8px; left: -8px; width: 16px; height: 16px; cursor: nesw-resize; }
+
+    .overlay-shell {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      border: 0;
+      border-radius: calc(var(--radius) * 1px);
+      overflow: hidden;
+      background: var(--overlay-bg);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(6px) saturate(102%);
+      transform-origin: center center;
+      transform: scale(var(--ui-scale));
+      transition: transform var(--transition-med), box-shadow var(--transition-med), opacity var(--transition-fast);
+      -webkit-app-region: drag;
+    }
+
+    .overlay-shell button,
+    .overlay-shell input,
+    .overlay-shell select,
+    .overlay-shell textarea,
+    .overlay-shell label,
+    .overlay-shell a,
+    .overlay-shell .resize-handle,
+    .overlay-shell .maps-image-handle,
+    .overlay-shell .preview-hud,
+    .overlay-shell [data-tooltip] {
+      -webkit-app-region: no-drag;
+    }
+
+    /* When full transparency is requested, clear container backgrounds but keep text/pill borders visible */
+    .overlay-full-transparent .overlay-shell {
+      border: none !important;
+      box-shadow: none !important;
+      outline: none !important;
+      background-image: none !important;
+      background-color: transparent !important;
+      backdrop-filter: none !important;
+    }
+
+    .overlay-full-transparent .onevone-container,
+    .overlay-full-transparent .maps-stage,
+    .overlay-full-transparent .scrim-art,
+    .overlay-full-transparent .fourvone-glass-inner,
+    .overlay-full-transparent .fourvone-glass-image,
+    .overlay-full-transparent .winstreak-art,
+    .overlay-full-transparent .winstreak-model,
+    .overlay-full-transparent .winstreak-fire-shell,
+    .overlay-full-transparent .winstreak-fire-layer,
+    .overlay-full-transparent .winstreak-fire-sparks,
+    .overlay-full-transparent .winstreak-dark-layout,
+    .overlay-full-transparent .winstreak-ember-layout,
+    .overlay-full-transparent .winstreak-ember-model,
+    .overlay-full-transparent .winstreak-art-survivor,
+    .overlay-full-transparent .survivor-emblem,
+    .overlay-full-transparent .fourvone-glass-inner,
+    .overlay-full-transparent .fourvone-glass-image {
+      box-shadow: none !important;
+      background-image: none !important;
+      background-color: transparent !important;
+      backdrop-filter: none !important;
+    }
+
+    .overlay-full-transparent .fourvone-glass-smoke {
+      opacity: 0 !important;
+    }
+
+    .overlay-full-transparent .winstreak-fire-shell,
+    .overlay-full-transparent .winstreak-dark-layout,
+    .overlay-full-transparent .winstreak-ember-layout {
+      border-color: transparent !important;
+      outline: none !important;
+    }
+
+    .overlay-full-transparent .winstreak-survivor-progress-shell,
+    .overlay-full-transparent .winstreak-survivor-progress-ring,
+    .overlay-full-transparent .winstreak-survivor-progress-bar,
+    .overlay-full-transparent .winstreak-survivor-progress-track,
+    .overlay-full-transparent .winstreak-survivor-progress-fill,
+    .overlay-full-transparent .winstreak-survivor-progress-side {
+      border-color: transparent !important;
+      background: transparent !important;
+      box-shadow: none !important;
+    }
+
+    .overlay-full-transparent .winstreak-model::after,
+    .overlay-full-transparent .winstreak-art::after,
+    .overlay-full-transparent .winstreak-art-survivor::before,
+    .overlay-full-transparent .survivor-emblem::before {
+      box-shadow: none !important;
+      border-color: transparent !important;
+    }
+
+    .overlay-full-transparent .winstreak-fire-layer,
+    .overlay-full-transparent .winstreak-fire-sparks {
+      opacity: 0 !important;
+    }
+
+    .overlay-full-transparent .scrim-setlabel,
+    .overlay-full-transparent .scrim-detail,
+    .overlay-full-transparent .scrim-wincon,
+    .overlay-full-transparent .fourvone-topline,
+    .overlay-full-transparent .scrim-meta,
+    .overlay-full-transparent .scrim-content,
+    .overlay-full-transparent .fourvone-glass-wrap {
+      background: transparent !important;
+      box-shadow: none !important;
+      backdrop-filter: none !important;
+    }
+
+    /* Minimal boxes mode: remove pill/card backgrounds and borders for specific elements */
+    .overlay-minimal .scrim-detail,
+    .overlay-minimal .scrim-setlabel,
+    .overlay-minimal .scrim-wincon,
+    .overlay-minimal .winstreak-wincon,
+    .overlay-minimal .onevone-card,
+    .overlay-minimal .maps-card,
+    .overlay-minimal .onevone-players,
+    .overlay-minimal .scrim-meta {
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      padding: 0 !important;
+      margin: 0 !important;
+    }
+
+    .overlay-minimal .scrim-detail[data-tooltip] { padding-left: 6px; padding-right:6px; }
+
+    .overlay-unavailable {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      background: #1a1a1a !important;
+    }
+
+    .unavailable-message {
+      text-align: center;
+      color: white;
+      font-size: 48px;
+      font-weight: 700;
+      letter-spacing: 2px;
+    }
+
+    .unavailable-text {
+      font-size: 48px;
+      margin-bottom: 16px;
+      color: white;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .unavailable-subtext {
+      font-size: 24px;
+      color: white;
+      font-weight: 400;
+      opacity: 0.8;
+    }
+
+    /* Force scrim overlay full transparency: remove visible backgrounds, but add floating border frames */
+    .overlay-shell.ov-fourvone {
+      background: transparent !important;
+      box-shadow: none !important;
+      backdrop-filter: none !important;
+    }
+
+    /* Scrim matchup: killer vs team names - static text, no wrapping, no floating */
+    .overlay-shell.ov-fourvone .scrim-matchup {
+      display: block !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      background: transparent !important;
+      border: 1.5px solid rgba(118, 197, 182, 0.4) !important;
+      border-radius: 12px !important;
+      padding: 8px 12px !important;
+      box-shadow: 0 0 16px rgba(118, 197, 182, 0.12) !important;
+      white-space: nowrap !important;
+      font-size: clamp(16px, 3vw, 28px) !important;
+      color: var(--overlay-text) !important;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Scrim wincon pill */
+    .overlay-shell.ov-fourvone .scrim-wincon {
+      display: inline-flex !important;
+      background: transparent !important;
+      border: 1.5px solid rgba(118, 197, 182, 0.4) !important;
+      border-radius: 12px !important;
+      padding: 6px 12px !important;
+      box-shadow: 0 0 16px rgba(118, 197, 182, 0.12) !important;
+      transition: box-shadow var(--transition-med), border-color var(--transition-med);
+      animation: floatingBorder 3.2s ease-in-out infinite;
+      animation-delay: 0.4s;
+      color: var(--overlay-muted) !important;
+    }
+
+    /* Scrim detail pills */
+    .overlay-shell.ov-fourvone .scrim-detail {
+      display: inline-flex !important;
+      background: transparent !important;
+      border: 1.5px solid rgba(118, 197, 182, 0.4) !important;
+      border-radius: 12px !important;
+      padding: 6px 12px !important;
+      box-shadow: 0 0 16px rgba(118, 197, 182, 0.12) !important;
+      transition: box-shadow var(--transition-med), border-color var(--transition-med);
+      animation: floatingBorder 3.2s ease-in-out infinite;
+      color: var(--overlay-muted) !important;
+    }
+
+    .overlay-shell.ov-fourvone .scrim-setlabel {
+      display: inline-flex !important;
+      align-items: center;
+      gap: 8px;
+      font-size: clamp(13px, 1.3vw, 18px) !important;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: var(--overlay-text) !important;
+      background: rgba(8, 12, 18, 0.72) !important;
+      border: 1px solid rgba(118, 197, 182, 0.62) !important;
+      border-radius: 999px !important;
+      padding: 8px 14px !important;
+      box-shadow: 0 0 18px rgba(118, 197, 182, 0.18) !important;
+      animation: floatingBorder 3.2s ease-in-out infinite;
+    }
+
+    @keyframes floatingBorder {
+      0% { 
+        transform: translateY(0) scale(1);
+        border-color: rgba(118, 197, 182, 0.3);
+        box-shadow: 0 0 16px rgba(118, 197, 182, 0.12);
+      }
+      50% { 
+        transform: translateY(-3px) scale(1.02);
+        border-color: rgba(118, 197, 182, 0.6);
+        box-shadow: 0 8px 24px rgba(118, 197, 182, 0.18);
+      }
+      100% { 
+        transform: translateY(0) scale(1);
+        border-color: rgba(118, 197, 182, 0.3);
+        box-shadow: 0 0 16px rgba(118, 197, 182, 0.12);
+      }
+    }
+
+    .overlay-hidden {
+      display: none !important;
+    }
+
+    .overlay-label {
+      position: absolute;
+      top: 14px;
+      left: 16px;
+      z-index: 3;
+      font-size: 10px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--overlay-muted);
+    }
+
+    .overlay-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: calc(var(--space-sm)) calc(var(--space-md));
+      border-radius: 999px;
+      border: 1px solid var(--neutral-2);
+      background: rgba(255,255,255,0.02);
+      backdrop-filter: blur(6px);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .overlay-badge .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--overlay-accent);
+      box-shadow: 0 0 16px rgba(118, 197, 182, 0.65);
+    }
+
+    .timer {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: calc(clamp(28px, 6vw, 64px) * var(--ui-scale));
+      font-weight: 700;
+      letter-spacing: 3px;
+      line-height: 1;
+      color: var(--text);
+      text-shadow: 0 6px 28px rgba(0,0,0,0.45);
+      transition: color var(--transition-fast), transform var(--transition-fast), text-shadow var(--transition-fast);
+      will-change: transform, color;
+    }
+
+    .timer.running {
+      color: #77e3c6;
+    }
+
+    .timer.warning { color: var(--warn); }
+    .timer.danger { color: var(--danger); }
+
+    /* Replace harsh blinking with a soft pulsing glow */
+    .timer.pulse {
+      animation: timerPulse 900ms infinite ease-in-out;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+    }
+
+    @keyframes timerPulse {
+      0% { text-shadow: 0 6px 18px rgba(255,138,153,0.06), 0 0 0 rgba(0,0,0,0); transform: scale(1); }
+      50% { text-shadow: 0 10px 36px rgba(255,138,153,0.12), 0 0 24px rgba(255,138,153,0.06); transform: scale(1.02); }
+      100% { text-shadow: 0 6px 18px rgba(255,138,153,0.06), 0 0 0 rgba(0,0,0,0); transform: scale(1); }
+    }
+
+    .ov-onevone,
+    .ov-maps,
+    .ov-fourvone,
+    .ov-winstreak,
+    .ov-queue {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      z-index: 2;
+      padding: 0;
+      display: flex;
+    }
+
+    .ov-onevone {
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ov-winstreak {
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ov-queue {
+      align-items: stretch;
+      justify-content: center;
+    }
+
+    .queue-wrap {
+      width: min(100%, 1100px);
+      margin: 0 auto;
+      display: grid;
+      gap: 16px;
+      padding: 28px;
+      border-radius: 28px;
+      background: linear-gradient(180deg, rgba(12,16,28,0.92), rgba(8,10,18,0.88));
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 26px 60px rgba(0,0,0,0.34);
+      backdrop-filter: blur(18px);
+    }
+
+    .queue-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .queue-title {
+      font-size: calc(32px * var(--ui-scale));
+      font-weight: 800;
+      letter-spacing: 0.6px;
+      color: var(--text);
+    }
+
+    .queue-subtitle {
+      margin-top: 6px;
+      font-size: calc(14px * var(--ui-scale));
+      color: var(--text-dim);
+    }
+
+    .queue-count {
+      flex-shrink: 0;
+      min-width: 84px;
+      padding: 14px 18px;
+      border-radius: 18px;
+      text-align: center;
+      font-size: calc(28px * var(--ui-scale));
+      font-weight: 800;
+      color: #fff;
+      background: linear-gradient(180deg, rgba(71,164,255,0.96), rgba(44,123,255,0.82));
+      box-shadow: 0 12px 28px rgba(44,123,255,0.28);
+    }
+
+    .queue-count span {
+      display: block;
+      font-size: calc(11px * var(--ui-scale));
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      opacity: 0.82;
+    }
+
+    .queue-message {
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: var(--text-dim);
+      font-size: calc(14px * var(--ui-scale));
+      line-height: 1.5;
+    }
+
+    .queue-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .queue-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.025));
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .queue-row-name {
+      font-size: calc(18px * var(--ui-scale));
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: 0.2px;
+    }
+
+    .queue-row-index {
+      flex-shrink: 0;
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      font-size: calc(13px * var(--ui-scale));
+      font-weight: 800;
+      color: #dbe8ff;
+      background: rgba(71,164,255,0.18);
+      border: 1px solid rgba(71,164,255,0.28);
+    }
+
+    .queue-empty {
+      padding: 18px 16px;
+      border-radius: 16px;
+      color: var(--text-dim);
+      background: rgba(255,255,255,0.03);
+      border: 1px dashed rgba(255,255,255,0.12);
+      text-align: center;
+      font-size: calc(14px * var(--ui-scale));
+    }
+
+    .onevone-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: calc(var(--space-lg));
+      gap: calc(var(--space-lg));
+    }
+
+    .onevone-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+      align-items: center;
+      width: 100%;
+      gap: 24px;
+    }
+
+    .player-section {
+      flex: 1;
+      text-align: left;
+      display: grid;
+      gap: 8px;
+    }
+
+    .player-name {
+      font-size: calc(18px * var(--ui-scale));
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: 0.6px;
+      line-height: 1.05;
+    }
+
+    .score-section {
+      flex-shrink: 0;
+    }
+
+    .player-section.is-active .player-name {
+      color: var(--accent-1);
+    }
+
+    .player-section.is-active .score,
+    .score-section.is-running .onevone-timer {
+      color: var(--accent-2);
+    }
+
+    .score {
+      font-size: calc(22px * var(--ui-scale));
+      font-weight: 700;
+      color: var(--accent-1);
+      letter-spacing: 1px;
+      min-width: 72px;
+      text-align: center;
+    }
+
+    .onevone-timer {
+      font-size: calc(40px * var(--ui-scale));
+      font-weight: 800;
+      color: var(--accent-2);
+      font-family: 'Cinzel', serif;
+      letter-spacing: 1px;
+      min-width: 160px;
+      text-align: center;
+      transition: transform var(--transition-fast), color var(--transition-fast);
+      transform-origin: center center;
+      background: rgba(0,0,0,0.72);
+      padding: 18px 28px;
+      border-radius: 12px;
+      box-shadow: inset 0 -8px 24px rgba(0,0,0,0.6), 0 12px 34px rgba(0,0,0,0.45);
+    }
+
+    .onevone-card {
+      min-width: min(100%, 780px);
+      padding: calc(var(--space-md)) calc(var(--space-lg));
+      border-radius: var(--radius);
+      border: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      backdrop-filter: blur(6px);
+      display: grid;
+      gap: calc(var(--space-sm));
+      text-align: center;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .onevone-title,
+    .maps-title,
+    .fourvone-title {
+      font-size: 11px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--overlay-muted);
+    }
+
+    .onevone-players {
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      font-size: 12px;
+      letter-spacing: 2px;
+      color: var(--overlay-muted);
+    }
+
+    .onevone-players span:first-child,
+    .onevone-players span:last-child {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--overlay-text);
+      min-width: 80px;
+      text-align: center;
+    }
+
+    .onevone-board {
+      width: min(100%, 920px);
+      display: grid;
+      gap: 14px;
+      padding: 12px;
+    }
+
+    .onevone-head {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .onevone-name {
+      font-size: clamp(16px, 2vw, 22px);
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.9);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .onevone-name.right {
+      text-align: right;
+    }
+
+    .onevone-score-pill {
+      min-width: 104px;
+      text-align: center;
+      padding: 8px 14px;
+      border-radius: 10px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.06));
+      border: 1px solid rgba(255,255,255,0.08);
+      color: #fff;
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 2px;
+    }
+
+    .onevone-row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .onevone-side {
+      display: grid;
+      gap: 10px;
+      justify-items: center;
+      padding: 12px 10px 16px;
+      border-radius: 14px;
+      background: rgba(0,0,0,0.18);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .onevone-side-label {
+      font-size: 12px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.55);
+    }
+
+    .onevone-side-timer {
+      min-width: 100%;
+      text-align: center;
+      padding: 18px 16px;
+      border-radius: 12px;
+      background: rgba(0,0,0,0.72);
+      box-shadow: inset 0 -8px 22px rgba(0,0,0,0.6);
+      font-family: 'Cinzel', serif;
+      font-size: clamp(38px, 6vw, 64px);
+      line-height: 1;
+      letter-spacing: 2px;
+      font-weight: 700;
+      color: #f5f6f7;
+    }
+
+    /* User requested: hide the small labels/headers and make timer boxes transparent */
+    .ov-onevone .onevone-board {
+      width: min(100%, 1120px);
+      display: grid;
+      gap: 18px;
+      padding: 12px 14px 16px;
+      border-radius: 24px;
+      background: linear-gradient(180deg, rgba(8,10,14,0.2), rgba(8,10,14,0.08));
+      border: 1px solid rgba(255,255,255,0.04);
+      box-shadow: 0 18px 48px rgba(0,0,0,0.22);
+      backdrop-filter: blur(4px);
+    }
+
+    .ov-onevone .onevone-head {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: end;
+      gap: 16px;
+      padding: 4px 2px 0;
+    }
+
+    .ov-onevone .onevone-name {
+      font-size: clamp(18px, 2.1vw, 28px);
+      letter-spacing: 3px;
+      color: rgba(255,255,255,0.92);
+      text-shadow: 0 2px 14px rgba(0,0,0,0.3);
+    }
+
+    .ov-onevone .onevone-name.right { text-align: right; }
+
+    .ov-onevone .onevone-score-pill {
+      min-width: 98px;
+      border-radius: 999px;
+      padding: 8px 16px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.06);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+      font-size: 14px;
+      letter-spacing: 3px;
+    }
+
+    .ov-onevone .onevone-row {
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .ov-onevone .onevone-side {
+      padding: 18px 14px 16px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.015);
+      border: 1px solid rgba(255,255,255,0.045);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.015);
+    }
+
+    .ov-onevone .onevone-side-label {
+      display: block;
+      font-size: 11px;
+      letter-spacing: 4px;
+      color: rgba(255,255,255,0.46);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .ov-onevone .onevone-side-timer {
+      min-width: 100%;
+      padding: 20px 18px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.78), rgba(0,0,0,0.54));
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 16px;
+      box-shadow: inset 0 -10px 24px rgba(0,0,0,0.55), 0 12px 24px rgba(0,0,0,0.18);
+      font-size: clamp(40px, 7vw, 72px) !important;
+      color: #f7f7f8 !important;
+      text-shadow: 0 4px 24px rgba(0,0,0,0.28) !important;
+      text-align: center;
+      transition: color 420ms ease, border-color 420ms ease, box-shadow 420ms ease, text-shadow 420ms ease, opacity 420ms ease, transform 420ms ease;
+    }
+
+    .ov-onevone .onevone-side-timer.running {
+      color: #f9fbff !important;
+      border-color: rgba(118,197,182,0.18);
+      box-shadow: inset 0 -10px 24px rgba(0,0,0,0.55), 0 0 28px rgba(118,197,182,0.10);
+    }
+
+    .ov-onevone .onevone-side.warning .onevone-side-timer,
+    .ov-onevone .onevone-side-timer.warning {
+      color: #ff6b7a !important;
+      border-color: rgba(255, 92, 110, 0.36) !important;
+      box-shadow: inset 0 -10px 24px rgba(0,0,0,0.55), 0 0 28px rgba(255, 92, 110, 0.22) !important;
+      animation: onevoneDangerPulse 850ms ease-in-out infinite;
+    }
+
+    .ov-onevone .onevone-side-timer.fade-out {
+      animation: onevoneWarningFadeOut 420ms ease forwards;
+    }
+
+    .ov-onevone .onevone-side-label {
+      display: none !important;
+    }
+
+    @keyframes onevoneDangerPulse {
+      0%, 100% {
+        opacity: 0.84;
+        transform: scale(1);
+        text-shadow: 0 4px 22px rgba(255, 92, 110, 0.18) !important;
+      }
+      50% {
+        opacity: 1;
+        transform: scale(1.01);
+        text-shadow: 0 4px 30px rgba(255, 92, 110, 0.34) !important;
+      }
+    }
+
+    @keyframes onevoneWarningFadeOut {
+      0% {
+        color: #ff6b7a;
+        box-shadow: inset 0 -10px 24px rgba(0,0,0,0.55), 0 0 28px rgba(255, 92, 110, 0.22);
+      }
+      100% {
+        color: #f7f7f8;
+        box-shadow: inset 0 -10px 24px rgba(0,0,0,0.55), 0 12px 24px rgba(0,0,0,0.18);
+      }
+    }
+
+    .ov-onevone .onevone-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0 4px;
+      color: rgba(255,255,255,0.52);
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    @media (max-width: 720px) {
+      .ov-onevone .onevone-head {
+        grid-template-columns: 1fr;
+        justify-items: center;
+        text-align: center;
+      }
+
+      .ov-onevone .onevone-name.right {
+        text-align: center;
+      }
+
+      .ov-onevone .onevone-row {
+        grid-template-columns: 1fr;
+      }
+
+      .ov-onevone .onevone-footer {
+        flex-direction: column;
+      }
+    }
+
+    .onevone-side-timer.running {
+      color: var(--accent-3);
+      box-shadow: 0 0 0 1px rgba(118,197,182,0.16), inset 0 -8px 22px rgba(0,0,0,0.6), 0 0 20px rgba(118,197,182,0.08);
+    }
+
+    .onevone-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      font-size: 12px;
+      letter-spacing: 1.6px;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.55);
+      padding: 0 2px;
+    }
+
+    @media (max-width: 640px) {
+      .onevone-head {
+        grid-template-columns: 1fr;
+        justify-items: center;
+        text-align: center;
+      }
+
+      .onevone-name.right {
+        text-align: center;
+      }
+
+      .onevone-row {
+        grid-template-columns: 1fr;
+      }
+
+      .onevone-footer {
+        flex-direction: column;
+        text-align: center;
+      }
+    }
+
+    .ov-maps {
+      align-items: stretch;
+      justify-content: stretch;
+      padding: 0;
+      background: transparent !important;
+      box-shadow: none !important;
+      border: 0 !important;
+      backdrop-filter: none !important;
+    }
+
+    .maps-stage {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      box-shadow: none;
+      border: 0;
+    }
+
+    .maps-image {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      pointer-events: auto;
+      filter: saturate(1.04) contrast(1.02);
+      transform-origin: center center;
+      animation: fadeUp 320ms ease-out forwards;
+    }
+
+    .maps-image-fade {
+      display: none;
+    }
+
+    .maps-image-handle {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      background: transparent;
+      border: none;
+      border-radius: 2px;
+      pointer-events: none;
+      z-index: 10;
+      display: none !important;
+    }
+
+    .maps-image-handle:hover {
+      background: rgba(118, 197, 182, 0.7);
+    }
+
+    .maps-image-handle.handle-tl { top: -7px; left: -7px; cursor: nwse-resize; }
+    .maps-image-handle.handle-tm { top: -7px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
+    .maps-image-handle.handle-tr { top: -7px; right: -7px; cursor: nesw-resize; }
+    .maps-image-handle.handle-ml { top: 50%; left: -7px; transform: translateY(-50%); cursor: ew-resize; }
+    .maps-image-handle.handle-mr { top: 50%; right: -7px; transform: translateY(-50%); cursor: ew-resize; }
+    .maps-image-handle.handle-bl { bottom: -7px; left: -7px; cursor: nesw-resize; }
+    .maps-image-handle.handle-bm { bottom: -7px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
+    .maps-image-handle.handle-br { bottom: -7px; right: -7px; cursor: nwse-resize; }
+
+    .maps-overlay {
+      position: absolute;
+      inset: 0;
+      display: none;
+    }
+
+    .maps-top,
+    .maps-bottom {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 12px;
+    }
+
+    .maps-card {
+      min-width: 220px;
+      max-width: 72%;
+      padding: 14px 16px;
+      border-radius: 0;
+      border: 0;
+      background: transparent;
+      backdrop-filter: none;
+      box-shadow: none;
+    }
+
+    .maps-map-name {
+      font-family: 'Cinzel', serif;
+      font-size: clamp(22px, 3vw, 40px);
+      letter-spacing: 2px;
+      line-height: 1.05;
+      margin-top: 4px;
+    }
+
+    .maps-emoji {
+      font-size: 26px;
+      line-height: 1;
+    }
+
+    .maps-clock {
+      align-self: flex-end;
+      padding: calc(var(--space-sm)) calc(var(--space-md));
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255, calc(0.06 * var(--overlay-bg-alpha)));
+      background: rgba(7,10,16,0.78);
+      backdrop-filter: blur(6px);
+      display: inline-flex;
+      gap: 10px;
+      align-items: baseline;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.36);
+    }
+
+    /* Preview / edit overlay safe-zone grid */
+    body.preview-mode .overlay-shell {
+      outline: 1px dashed rgba(255,255,255,0.06);
+    }
+
+    .safe-zone {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 48px 48px;
+      opacity: 0.9;
+      mix-blend-mode: overlay;
+      display: none;
+    }
+
+    body.preview-mode .safe-zone { display: block; }
+
+    /* Preview HUD */
+    .preview-hud {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 999;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .preview-hud .ph-btn {
+      padding: 6px 10px;
+      background: rgba(0,0,0,0.45);
+      color: var(--text);
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255, calc(0.06 * var(--overlay-bg-alpha)));
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .maps-clock .timer {
+      font-size: clamp(28px, 5vw, 56px);
+    }
+
+    .maps-clock-label {
+      font-size: 10px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--overlay-muted);
+      white-space: nowrap;
+    }
+
+    .map-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .map-list-item {
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: rgba(118, 197, 182, 0.08);
+      border: 1px solid rgba(118, 197, 182, calc(0.16 * var(--overlay-bg-alpha)));
+      font-size: 12px;
+      letter-spacing: 1px;
+      color: var(--overlay-text);
+      text-transform: capitalize;
+    }
+
+    .ov-fourvone {
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+
+    .fourvone-wrap {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      grid-template-columns: 160px 1fr;
+      gap: 28px 36px;
+      align-items: center;
+      justify-content: stretch;
+      text-align: left;
+      padding: 28px 36px;
+    }
+    .scrim-art {
+      width: 220px;
+      height: 280px;
+      border-radius: 12px;
+      overflow: hidden;
+      display: block;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, calc(0.08 * var(--overlay-bg-alpha)));
+    }
+
+    .scrim-art img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      padding: 8px 6px;
+      filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.28));
+      background: transparent;
+    }
+
+    /* Ladder overlay styles */
+    .ov-ladder { display:flex; align-items:center; justify-content:center; }
+    .ladder-compact-inner { text-align:center; color: var(--overlay-text); }
+    .ladder-name { font-size: 28px; font-weight:700; }
+    .ladder-elo { font-size: 22px; margin-top:6px; opacity:0.95 }
+    .ladder-sub { font-size:14px; opacity:0.8; margin-top:4px }
+    /* Pedro-style ladder card (primary) */
+    .ladder-pedro { width: 520px; padding:14px 18px; border-radius:18px; background:linear-gradient(180deg, rgba(8,10,12,0.68), rgba(20,22,24,0.72)); box-shadow: 0 8px 24px rgba(2,6,10,0.6); color:var(--overlay-text); display:flex; gap:14px; align-items:center; position:relative }
+    .ladder-pedro .pedro-avatar { width:72px; height:72px; border-radius:12px; overflow:hidden; background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)); display:flex; align-items:center; justify-content:center }
+    .ladder-pedro .pedro-avatar { width:72px; height:72px; border-radius:50%; overflow:hidden; background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)); display:flex; align-items:center; justify-content:center; border:2px solid rgba(255,255,255,0.04) }
+    .ladder-pedro .pedro-avatar img { width:100%; height:100%; object-fit:cover }
+    .ladder-pedro .pedro-content { flex:1; display:flex; flex-direction:column }
+    .ladder-pedro .pedro-top { display:flex; justify-content:space-between; align-items:flex-start }
+    .ladder-pedro .pedro-name { font-size:20px; font-weight:900; color:#fff; margin-bottom:2px }
+    .ladder-pedro .pedro-elo { font-size:18px; font-weight:800; color:#e6f6f4 }
+    .ladder-pedro .pedro-stats { display:flex; gap:12px; align-items:center; margin-top:10px }
+    .ladder-pedro .pedro-winrate { flex:1 }
+    .ladder-pedro .pedro-bar { height:12px; background:rgba(255,255,255,0.06); border-radius:10px; overflow:hidden }
+    .ladder-pedro .pedro-bar-fill { height:100%; background:linear-gradient(90deg,#2ad6b8,#19a9e0); box-shadow:0 4px 18px rgba(26,181,150,0.18); transition:width 700ms cubic-bezier(.22,.9,.32,1) }
+    .ladder-pedro .pedro-meta { font-size:12px; color:rgba(255,255,255,0.78); font-weight:700 }
+    .ladro-last10 { display:flex; gap:8px; margin-top:12px; align-items:center }
+    .ladro-last10 .dot { min-width:18px; height:18px; border-radius:4px; display:inline-flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; color:#0b0f10 }
+    .dot.win { background:#0fd59a; box-shadow:0 0 8px rgba(15,213,154,0.22) }
+    .dot.loss { background:#e05656 }
+    .ladder-pedro .pedro-rank { position:absolute; right:12px; top:12px; background:rgba(255,255,255,0.08); color:#fff; padding:6px 10px; border-radius:10px; font-size:12px; font-weight:900 }
+    .ladder-pedro-compact { width:420px; padding:10px 12px; border-radius:12px }
+    .ladder-pedro.animated { transform:translateY(-10px); opacity:0; animation:pedro-drop 520ms cubic-bezier(.2,.9,.3,1) forwards }
+    .ladder-pedro::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: linear-gradient(120deg, transparent 18%, rgba(125,211,252,0.08) 46%, transparent 72%);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(-22%);
+    }
+    .ladder-pedro.ladder-animate-in::before {
+      animation: ladder-shimmer 1200ms ease-out 180ms both;
+    }
+    .ladder-pedro.ladder-animate-in .pedro-bar-fill {
+      animation: ladder-fill-pop 860ms cubic-bezier(.2,.9,.3,1) 120ms both;
+    }
+    @keyframes ladder-shimmer {
+      0% { opacity: 0; transform: translateX(-24%); }
+      35% { opacity: 1; }
+      100% { opacity: 0; transform: translateX(24%); }
+    }
+    @keyframes ladder-fill-pop {
+      from { transform: scaleX(0.08); transform-origin: left center; }
+      to { transform: scaleX(1); transform-origin: left center; }
+    }
+    .ladder-pedro .pedro-avatar img { width:100%; height:100%; object-fit:cover }
+    .ladder-pedro .pedro-content { flex:1; display:flex; flex-direction:column }
+    .ladder-pedro .pedro-top { display:flex; justify-content:space-between; align-items:flex-start }
+    .ladder-pedro .pedro-name { font-size:20px; font-weight:800; margin-bottom:4px }
+    .ladder-pedro .pedro-elo { font-size:18px; font-weight:700; opacity:0.95 }
+    .ladder-pedro .pedro-stats { display:flex; gap:12px; align-items:center; margin-top:8px }
+    .ladder-pedro .pedro-winrate { flex:1 }
+    .ladder-pedro .pedro-bar { height:10px; background:rgba(255,255,255,0.06); border-radius:8px; overflow:hidden }
+    .ladder-pedro .pedro-bar-fill { height:100%; background:linear-gradient(90deg,#3ee3c3,#2bb3f0); box-shadow:0 2px 8px rgba(43,201,170,0.16); transition:width 700ms cubic-bezier(.22,.9,.32,1) }
+    .ladder-pedro .pedro-meta { font-size:12px; opacity:0.8 }
+    .ladro-last10 { display:flex; gap:6px; margin-top:10px }
+    .ladro-last10 .dot { width:14px; height:14px; border-radius:4px; display:inline-block }
+    .dot.win { background:#19c37d; box-shadow:0 0 8px rgba(25,195,125,0.28) }
+    .dot.loss { background:#d9534f }
+    .ladder-avatar-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-weight:700; color:var(--overlay-text); background:transparent }
+    .pedro-rank { background:rgba(255,255,255,0.06); padding:6px 10px; border-radius:8px; font-size:12px; font-weight:700 }
+    /* compact Pedro variant */
+    .ladder-pedro-compact { width:420px; padding:14px; border-radius:12px }
+    /* animated variant: subtle entrance */
+    .ladder-pedro.animated { transform:translateY(-6px); opacity:0; animation:pedro-drop 520ms cubic-bezier(.2,.9,.3,1) forwards }
+    @keyframes pedro-drop { to { transform:none; opacity:1 } }
+
+    .ladder-medium-inner { display:flex; gap:18px; align-items:center; color:var(--overlay-text); }
+    .ladder-medium .ladder-name { font-size:32px; font-weight:700 }
+    .ladder-medium .ladder-stats { text-align:left }
+    .ladder-medium .ladder-meta { font-size:14px; opacity:0.85 }
+
+    .ladder-full-wrap { display:flex; gap:16px; align-items:center; color:var(--overlay-text); }
+    .ladder-avatar { width:96px; height:96px; border-radius:12px; overflow:hidden; background:rgba(255,255,255,0.03); }
+    .ladder-avatar img { width:100%; height:100%; object-fit:cover }
+    .ladder-name-large { font-size:34px; font-weight:800 }
+    .ladder-elo-large { font-size:24px; margin-top:6px }
+    .ladder-bar { width:320px; height:12px; background:rgba(255,255,255,0.06); border-radius:8px; overflow:hidden; margin-top:10px }
+    .ladder-bar-fill { height:100%; background:linear-gradient(90deg,#6ee7b7,#34d399); }
+    .ladder-compact-grid { display:flex; gap:40px; align-items:center; }
+    .ladder-medium-grid { display:flex; gap:60px; align-items:flex-start; }
+    .ladder-medium-col { flex:1; text-align:center }
+    .ladder-full-grid { display:flex; gap:40px; align-items:center }
+    .ladder-full-col { flex:1; display:flex; gap:12px; align-items:center }
+    .ladder-full-col .ladder-avatar { width:120px; height:120px }
+    .ladder-avatar-circle { width:96px; height:96px; border-radius:50%; overflow:hidden; border:1px solid rgba(255,255,255,0.06); background:rgba(255,255,255,0.03) }
+    .ladder-avatar-circle img { width:100%; height:100%; object-fit:cover }
+    .ladder-vs-shell { display:flex; align-items:center; justify-content:center }
+    .ladder-vs-grid { display:flex; align-items:center; gap:18px; width:min(860px, calc(100vw - 24px)); padding:20px 22px; border-radius:22px; background:linear-gradient(180deg, rgba(8,10,14,0.80), rgba(18,20,26,0.88)); border:1px solid rgba(255,255,255,0.06); box-shadow:0 20px 48px rgba(0,0,0,0.34) }
+    .ladder-vs-card { flex:1; display:flex; flex-direction:column; align-items:center; text-align:center; gap:6px; min-width:0 }
+    .ladder-vs-tag { font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:rgba(255,255,255,0.54); font-weight:900 }
+    .ladder-vs-name { font-size:20px; font-weight:900; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100% }
+    .ladder-vs-elo { font-size:17px; font-weight:800; color:#e6f6f4 }
+    .ladder-vs-meta { font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:rgba(255,255,255,0.72); font-weight:800 }
+    .ladder-vs-separator { width:72px; text-align:center; font-size:16px; font-weight:900; color:#7dd3fc; letter-spacing:0.28em; opacity:0.8 }
+
+    .overlay-empty-card,
+    .ladder-loading-card {
+      width: min(560px, calc(100vw - 40px));
+      padding: 22px 24px;
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(8, 10, 14, 0.82), rgba(16, 19, 24, 0.88));
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.38);
+      color: var(--overlay-text);
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .overlay-empty-animated,
+    .ladder-loading-card {
+      animation: overlay-pop 520ms cubic-bezier(.2,.9,.3,1) both;
+    }
+
+    .overlay-empty-svg,
+    .ladder-loading-avatar {
+      width: 64px;
+      height: 64px;
+      flex: 0 0 64px;
+      display: grid;
+      place-items: center;
+      color: #7dd3fc;
+      filter: drop-shadow(0 8px 18px rgba(45, 212, 191, 0.18));
+    }
+
+    .overlay-empty-svg svg,
+    .ladder-loading-avatar svg { width: 64px; height: 64px; }
+
+    .overlay-empty-title,
+    .ladder-loading-name {
+      font-size: 20px;
+      font-weight: 900;
+      letter-spacing: 0.02em;
+      color: #fff;
+    }
+
+    .overlay-empty-subtitle,
+    .ladder-loading-sub {
+      margin-top: 4px;
+      color: rgba(255,255,255,0.72);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .ladder-loading-bars {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .ladder-loading-bars span {
+      width: 36px;
+      height: 8px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(45, 212, 191, 0.38), rgba(125, 211, 252, 0.8));
+      animation: bar-pulse 900ms ease-in-out infinite;
+    }
+
+    .ladder-loading-bars span:nth-child(2) { animation-delay: 140ms; }
+    .ladder-loading-bars span:nth-child(3) { animation-delay: 280ms; }
+
+    @keyframes overlay-pop {
+      from { opacity: 0; transform: translateY(10px) scale(0.985); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes bar-pulse {
+      0%, 100% { transform: scaleX(0.82); opacity: 0.55; }
+      50% { transform: scaleX(1); opacity: 1; }
+    }
+
+    /* New Ladder Card Design */
+    .ov-ladder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+
+    .overlay-shell.ov-ladder {
+      border-radius: 999px;
+    }
+
+    .ladder-matchup {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 10px 12px;
+      width: 100%;
+      height: 100%;
+      animation: ladderShine 1800ms ease-out forwards;
+    }
+
+    .ladder-player-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .ladder-player-avatar {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      flex-shrink: 0;
+      animation: ladderFloat 3.8s ease-in-out infinite;
+    }
+
+    .ladder-player-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      align-items: center;
+      min-width: 0;
+      text-align: center;
+    }
+
+    .ladder-player-name {
+      color: #fff;
+      font-size: clamp(11px, 1.8vw, 14px);
+      font-weight: 900;
+      line-height: 1.1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .ladder-player-elo {
+      color: rgba(245, 250, 255, 0.9);
+      font-size: clamp(9px, 1.4vw, 11px);
+      font-weight: 800;
+    }
+
+    .ladder-player-rank {
+      color: #dff7f4;
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 999px;
+      border: 0.5px solid rgba(45, 214, 184, 0.2);
+      background: rgba(15, 18, 24, 0.6);
+    }
+
+    .ladder-player-streak {
+      margin-top: 1px;
+    }
+
+    .ladder-player-stats {
+      display: flex;
+      gap: 8px;
+      margin-top: 2px;
+      font-size: 9px;
+    }
+
+    .ladder-player-stats .stat {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      align-items: center;
+    }
+
+    .ladder-player-stats .label {
+      color: rgba(216, 234, 255, 0.5);
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .ladder-player-stats .val {
+      color: #fff;
+      font-weight: 800;
+      font-size: 10px;
+    }
+
+    .ladder-vs {
+      color: rgba(255, 255, 255, 0.4);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 0 6px;
+      flex-shrink: 0;
+    }
+
+    .ladder-card {
+      width: min(100%, 580px);
+      min-height: 160px;
+      padding: 14px 16px;
+      border-radius: 999px;
+      display: grid;
+      grid-template-columns: 86px minmax(0, 1fr);
+      gap: 14px;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 18% 20%, rgba(45, 214, 184, 0.12), transparent 22%),
+        radial-gradient(circle at 80% 78%, rgba(25, 169, 224, 0.11), transparent 24%),
+        linear-gradient(180deg, rgba(12, 14, 19, 0.92), rgba(7, 9, 13, 0.94));
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow:
+        0 24px 64px rgba(0, 0, 0, 0.45),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(18px) saturate(120%);
+    }
+
+    .ladder-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg, transparent 18%, rgba(125, 211, 252, 0.12) 46%, transparent 70%);
+      transform: translateX(-26%);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .ladder-card-left {
+      display: grid;
+      place-items: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .ladder-card-avatar {
+      width: 78px;
+      height: 78px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 28% 24%, rgba(255,255,255,0.12), transparent 34%),
+        linear-gradient(180deg, rgba(42, 214, 184, 0.95), rgba(22, 143, 211, 0.96));
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow:
+        0 0 0 6px rgba(45, 214, 184, 0.08),
+        0 12px 24px rgba(0, 0, 0, 0.30);
+      transform: translateY(0);
+      animation: ladderFloat 3.8s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+
+    .ladder-card-avatar svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .ladder-card-right {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .ladder-card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-start;
+      gap: 8px;
+      min-width: 0;
+      flex-wrap: wrap;
+    }
+
+    .ladder-card-name {
+      color: #fff;
+      font-size: clamp(18px, 2.8vw, 24px);
+      font-weight: 900;
+      letter-spacing: 0.2px;
+      line-height: 1.05;
+      text-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .ladder-card-rank {
+      color: #dff7f4;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(45, 214, 184, 0.22);
+      background: rgba(15, 18, 24, 0.70);
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+      white-space: normal;
+      word-break: break-word;
+      max-width: 100%;
+      flex-shrink: 0;
+    }
+
+    .ladder-card-elo {
+      color: rgba(245, 250, 255, 0.96);
+      font-size: clamp(14px, 2vw, 18px);
+      font-weight: 800;
+      letter-spacing: 0.3px;
+      margin-top: 2px;
+    }
+
+    .ladder-card-badges {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 28px;
+      flex-wrap: wrap;
+    }
+
+    .ladder-badge-item {
+      min-width: 28px;
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      display: inline-grid;
+      place-items: center;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.12em;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(8px);
+    }
+
+    .ladder-badge-item.won {
+      background: rgba(45, 214, 184, 0.16);
+      color: #74f6df;
+      border-color: rgba(45, 214, 184, 0.24);
+      box-shadow: 0 0 16px rgba(45, 214, 184, 0.12);
+    }
+
+    .ladder-badge-item.lost {
+      background: rgba(255, 100, 100, 0.16);
+      color: #ff9191;
+      border-color: rgba(255, 100, 100, 0.20);
+    }
+
+    .ladder-badge-item.neutral {
+      background: rgba(255, 255, 255, 0.04);
+      color: rgba(255, 255, 255, 0.40);
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .ladder-card-stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 0;
+      padding-top: 6px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .ladder-card-stat {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .ladder-card-stat .label {
+      color: rgba(216, 234, 255, 0.56);
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .ladder-card-stat .value {
+      color: #fff;
+      font-size: clamp(12px, 1.8vw, 15px);
+      font-weight: 800;
+      letter-spacing: 0.1px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .ladder-card-bar {
+      height: 7px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      margin-top: 1px;
+    }
+
+    .ladder-card-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #2ad6b8, #19a9e0 64%, #81d6ff);
+      border-radius: inherit;
+      box-shadow: 0 0 16px rgba(45, 214, 184, 0.24);
+      transition: width 800ms cubic-bezier(0.22, 0.9, 0.28, 1);
+      will-change: width;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .ladder-card-bar-fill::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent);
+      transform: translateX(-100%);
+      animation: ladderBarSweep 2.8s ease-in-out infinite;
+    }
+
+    @keyframes ladderShine {
+      0% { opacity: 0; transform: translateX(-28%); }
+      35% { opacity: 0.8; }
+      70% { opacity: 0.3; }
+      100% { opacity: 0; transform: translateX(28%); }
+    }
+
+    @keyframes ladderFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-2px); }
+    }
+
+    @keyframes ladderBarSweep {
+      0% { transform: translateX(-120%); }
+      100% { transform: translateX(120%); }
+    }
+
+    @media (max-width: 640px) {
+      .ladder-card {
+        grid-template-columns: 72px minmax(0, 1fr);
+        gap: 12px;
+        padding: 12px 14px;
+        min-height: 0;
+        border-radius: 999px;
+      }
+
+      .ladder-card-avatar {
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+      }
+
+      .ladder-card-stats {
+        grid-template-columns: 1fr;
+        gap: 6px;
+      }
+
+      .ladder-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .ladder-card-rank {
+        padding: 4px 8px;
+        font-size: 10px;
+      }
+    }
+    .scrim-content {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: flex-start;
+      justify-content: center;
+    }
+
+    .scrim-label-row {
+      min-height: 34px;
+      display: flex;
+      align-items: center;
+      margin-bottom: 2px;
+    }
+
+    .scrim-art-fallback {
+      font-size: 40px;
+      color: var(--overlay-text);
+      text-shadow: 0 0 18px rgba(118, 197, 182, 0.25);
+    }
+
+    .scrim-matchup {
+      font-size: clamp(24px, 5vw, 44px);
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: var(--overlay-text);
+      text-transform: uppercase;
+      text-shadow: 0 0 18px rgba(118, 197, 182, 0.18);
+      line-height: 1.1;
+    }
+
+    .scrim-setlabel {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: clamp(13px, 1.3vw, 18px);
+      font-weight: 800;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--overlay-text);
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(var(--appearance-border-rgb, 118,197,182), 0.62);
+      background: rgba(8, 12, 18, 0.72);
+      backdrop-filter: blur(6px);
+      box-shadow: 0 0 18px rgba(118, 197, 182, 0.18);
+    }
+
+    .scrim-setlabel.is-empty {
+      opacity: 0.42;
+      border-style: dashed;
+      letter-spacing: 2px;
+    }
+
+    .fourvone-topline {
+      font-size: 11px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--overlay-muted);
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(var(--appearance-border-rgb, 118,197,182), calc(0.16 * var(--overlay-bg-alpha)));
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(6px);
+    }
+
+    .killer-score {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(72px, 12vw, 128px);
+      line-height: 1;
+      font-weight: 700;
+      letter-spacing: 4px;
+      color: var(--overlay-text);
+      text-shadow: 0 0 24px rgba(118, 197, 182, 0.18);
+    }
+
+    .scrim-wincon {
+      font-size: clamp(12px, 1.2vw, 15px);
+      font-weight: 700;
+      letter-spacing: 1.8px;
+      color: var(--overlay-text);
+      text-transform: uppercase;
+      text-shadow: 0 0 12px rgba(118, 197, 182, 0.12);
+      padding: 4px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(var(--appearance-border-rgb, 118,197,182), calc(0.16 * var(--overlay-bg-alpha)));
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(6px);
+    }
+
+    .scrim-meta {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 16px 18px;
+      max-width: 100%;
+    }
+
+    .scrim-detail {
+      font-size: 12px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--overlay-muted);
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(var(--appearance-border-rgb, 118,197,182), 0.16);
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(6px);
+      white-space: nowrap;
+    }
+
+    /* Glass & smoke variant for scrim overlay */
+    .ov-fourvone-glass .fourvone-glass-wrap {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      overflow: hidden;
+    }
+
+    .fourvone-glass-smoke {
+      position: absolute;
+      inset: 0;
+      background: 
+        radial-gradient(circle at 25% 50%, rgba(80, 60, 120, 0.4) 0%, transparent 35%),
+        radial-gradient(circle at 75% 60%, rgba(120, 90, 160, 0.3) 0%, transparent 40%),
+        linear-gradient(135deg, rgba(30, 20, 50, 0.6), rgba(40, 30, 70, 0.5) 40%, rgba(20, 15, 40, 0.6));
+      animation: smokeFlow 8s ease-in-out infinite;
+      filter: blur(28px);
+      z-index: 0;
+      opacity: 0.65;
+    }
+
+    .fourvone-glass-inner {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 24px;
+      align-items: center;
+      padding: 20px 28px;
+      border-radius: 16px;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 100%),
+        linear-gradient(180deg, rgba(60, 40, 100, 0.18), rgba(20, 15, 50, 0.22));
+      border: 1px solid rgba(255,255,255,0.18);
+      backdrop-filter: blur(24px);
+      box-shadow: 
+        0 0 60px rgba(120, 80, 180, 0.12),
+        inset 0 1px 0 rgba(255,255,255,0.12);
+      min-width: min(800px, 96vw);
+    }
+
+    .fourvone-glass-left {
+      display: grid;
+      place-items: center;
+    }
+
+    .fourvone-glass-image {
+      width: 100px;
+      height: 100px;
+      border-radius: 12px;
+      background: radial-gradient(circle, rgba(255,255,255,0.08), rgba(10,8,20,0.4));
+      border: 1px solid rgba(255,255,255,0.12);
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+    }
+
+    .fourvone-glass-image img,
+    .fourvone-glass-icon {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      padding: 6px;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));
+    }
+
+    .fourvone-glass-icon {
+      font-size: 48px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      opacity: 0.8;
+    }
+
+    .fourvone-glass-right {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .fourvone-glass-title {
+      color: #fff;
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      line-height: 1.1;
+      text-shadow: 0 2px 12px rgba(0,0,0,0.3);
+    }
+
+    .fourvone-glass-label {
+      color: rgba(255,255,255,0.8);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.16);
+      background: rgba(255,255,255,0.04);
+      width: fit-content;
+    }
+
+    .fourvone-glass-detail {
+      display: flex;
+      gap: 18px;
+      margin-top: 4px;
+    }
+
+    .fourvone-glass-detail-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .fourvone-glass-detail-item .label {
+      color: rgba(255,255,255,0.54);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+    }
+
+    .fourvone-glass-detail-item .value {
+      color: #fff;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .fourvone-glass-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .fourvone-glass-meta-item {
+      color: rgba(255,255,255,0.72);
+      font-size: 12px;
+      letter-spacing: 0.4px;
+    }
+
+    .fourvone-glass-meta-item strong {
+      color: #fff;
+      font-weight: 700;
+    }
+
+    @keyframes smokeFlow {
+      0%, 100% {
+        background-position: 0% 0%, 100% 100%;
+        opacity: 0.65;
+      }
+      25% {
+        background-position: 20% 10%, 80% 90%;
+        opacity: 0.55;
+      }
+      50% {
+        background-position: 40% 20%, 60% 80%;
+        opacity: 0.72;
+      }
+      75% {
+        background-position: 20% 10%, 80% 90%;
+        opacity: 0.6;
+      }
+    }
+
+    /* simple staggered fade-in for scrim parts */
+    .anim-fade-up { opacity: 0; transform: translateY(8px); animation: fadeUp 420ms cubic-bezier(.22,.9,.28,1) forwards; }
+    .anim-fade-up-del1 { animation-delay: 80ms; }
+    .anim-fade-up-del2 { animation-delay: 160ms; }
+    .anim-fade-up-del3 { animation-delay: 240ms; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Custom tooltip */
+    .custom-tooltip {
+      position: fixed;
+      pointer-events: none;
+      z-index: 2000;
+      padding: 6px 10px;
+      background: rgba(10,12,16,0.92);
+      color: #fff;
+      font-size: 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255, calc(0.06 * var(--overlay-bg-alpha)));
+      box-shadow: 0 8px 28px rgba(0,0,0,0.6);
+      transform: translateY(-8px) scale(0.98);
+      opacity: 0;
+      transition: opacity 160ms ease, transform 160ms cubic-bezier(.22,.9,.28,1);
+      white-space: nowrap;
+    }
+
+    .custom-tooltip.show {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    .teams-grid {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .team-card {
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(118, 197, 182, calc(0.16 * var(--overlay-bg-alpha)));
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(6px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .team-name {
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--overlay-muted);
+    }
+
+    .team-score {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(24px, 4vw, 42px);
+      font-weight: 700;
+      color: var(--overlay-text);
+    }
+
+    .overlay-empty {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      place-items: center;
+      color: var(--overlay-muted);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      font-size: 11px;
+      padding: 22px;
+      text-align: center;
+    }
+
+    .winstreak-wrap {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      grid-template-columns: 132px 1fr;
+      gap: 18px;
+      align-items: center;
+      padding: 20px;
+      border-radius: 0;
+      border: none;
+      background: transparent;
+      box-shadow: none;
+      backdrop-filter: none;
+    }
+
+    .winstreak-art-survivor {
+      padding: 14px;
+      border-radius: 24px;
+      border: 1px solid rgba(127, 149, 255, calc(0.18 * var(--overlay-bg-alpha)));
+      background:
+        radial-gradient(circle at 30% 25%, rgba(127,149,255,0.24), transparent 42%),
+        radial-gradient(circle at 70% 75%, rgba(118,197,182,0.18), transparent 48%),
+        linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+      box-shadow: 0 14px 30px rgba(0,0,0,0.22);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      text-align: center;
+    }
+
+    .survivor-emblem {
+      width: 84px;
+      height: 84px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      position: relative;
+      background: linear-gradient(180deg, rgba(12,17,28,0.82), rgba(7,11,18,0.66));
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: inset 0 0 0 1px rgba(127,149,255,0.12), 0 10px 24px rgba(0,0,0,0.28);
+      overflow: hidden;
+    }
+
+    .survivor-emblem::before {
+      content: '';
+      position: absolute;
+      inset: 14px;
+      border-radius: 50%;
+      border: 1px solid rgba(118,197,182,0.22);
+    }
+
+    .survivor-emblem svg {
+      width: 46px;
+      height: 46px;
+      display: block;
+      color: var(--overlay-text);
+      filter: drop-shadow(0 0 14px rgba(127,149,255,0.18));
+    }
+
+    .survivor-art-caption {
+      font-size: 10px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .winstreak-art {
+      width: 132px;
+      height: 132px;
+      border-radius: 24px;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(var(--appearance-border-rgb, 255,255,255), calc(0.08 * var(--overlay-bg-alpha)));
+    }
+
+    .winstreak-art img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      padding: 10px;
+      filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.28));
+    }
+
+    .winstreak-art-fallback {
+      font-size: 42px;
+      color: var(--overlay-text);
+      text-shadow: 0 0 18px rgba(118, 197, 182, 0.25);
+    }
+
+    .winstreak-survivor-minimal .winstreak-wrap {
+      grid-template-columns: 132px 1fr;
+    }
+
+    .winstreak-survivor-compact-shell,
+    .winstreak-survivor-glow-shell {
+      min-width: min(760px, 96vw);
+      min-height: 110px;
+      display: grid;
+      grid-template-columns: 96px 1fr 140px;
+      gap: 16px;
+      align-items: center;
+      padding: 16px 18px;
+      border-radius: 22px;
+      background: linear-gradient(180deg, rgba(13,14,18,0.96), rgba(8,9,12,0.94));
+      border: 1px solid rgba(255,255,255,0.07);
+      box-shadow: 0 18px 42px rgba(0,0,0,0.34);
+      position: relative;
+      overflow: hidden;
+      animation: winstreakRise 420ms cubic-bezier(.22,.9,.28,1) both;
+    }
+
+    .winstreak-survivor-compact-shell::before,
+    .winstreak-survivor-glow-shell::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 20% 50%, rgba(255,215,64,0.10), transparent 24%),
+                  radial-gradient(circle at 78% 72%, rgba(118,197,182,0.08), transparent 28%);
+      pointer-events: none;
+    }
+
+    .winstreak-survivor-badge {
+      display: grid;
+      place-items: center;
+    }
+
+    .survivor-emblem-compact {
+      width: 72px;
+      height: 72px;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), 0 10px 22px rgba(0,0,0,0.26);
+    }
+
+    .winstreak-survivor-copy {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .winstreak-survivor-top,
+    .winstreak-survivor-glow-top {
+      color: rgba(255,255,255,0.54);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+    }
+
+    .winstreak-survivor-count-row,
+    .winstreak-survivor-glow-count-row {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+
+    .winstreak-survivor-count,
+    .winstreak-survivor-glow-count {
+      color: #fff;
+      font-size: clamp(38px, 6vw, 66px);
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: 0.04em;
+    }
+
+    .winstreak-survivor-word,
+    .winstreak-survivor-glow-label {
+      color: rgba(255,255,255,0.42);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+    }
+
+    .winstreak-survivor-meta,
+    .winstreak-survivor-glow-meta {
+      color: rgba(255,255,255,0.68);
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .winstreak-survivor-badge-right {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
+      position: relative;
+      z-index: 1;
+    }
+
+    .winstreak-survivor-out {
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.76);
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-size: 10px;
+    }
+
+    .winstreak-survivor-glow-shell {
+      grid-template-columns: 80px 1fr;
+      gap: 18px;
+      padding-left: 20px;
+      border-color: rgba(255,210,82,0.12);
+      background:
+        linear-gradient(90deg, rgba(15,16,20,0.96), rgba(8,9,12,0.94)),
+        radial-gradient(circle at 16% 50%, rgba(255,209,68,0.12), transparent 18%);
+    }
+
+    .winstreak-survivor-glow-dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #ffd34d;
+      box-shadow: 0 0 0 8px rgba(255,211,77,0.12), 0 0 28px rgba(255,211,77,0.42);
+      animation: survivorGlowDot 2.8s ease-in-out infinite;
+      position: relative;
+      z-index: 1;
+      margin-left: 18px;
+    }
+
+    .winstreak-survivor-glow-count {
+      color: #fff;
+      text-shadow: 0 0 20px rgba(255,211,77,0.16);
+    }
+
+    .winstreak-survivor-glow-bar {
+      width: min(420px, 100%);
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      overflow: hidden;
+      margin-top: 4px;
+    }
+
+    .winstreak-survivor-glow-fill {
+      width: 58%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #ffd34d, #ffb43b);
+      box-shadow: 0 0 18px rgba(255,211,77,0.28);
+      animation: survivorFill 3.4s ease-in-out infinite;
+    }
+
+    .winstreak-survivor-glow-pill {
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.74);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .winstreak-survivor-glow-pill.highlight {
+      color: #ffd34d;
+      border-color: rgba(255,211,77,0.18);
+      box-shadow: 0 0 18px rgba(255,211,77,0.08);
+    }
+
+    @keyframes survivorGlowDot {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 8px rgba(255,211,77,0.12), 0 0 28px rgba(255,211,77,0.42); }
+      50% { transform: scale(1.12); box-shadow: 0 0 0 12px rgba(255,211,77,0.08), 0 0 34px rgba(255,211,77,0.5); }
+    }
+
+    @keyframes survivorFill {
+      0%, 100% { transform: translateX(0); opacity: 0.92; }
+      50% { transform: translateX(8px); opacity: 1; }
+    }
+
+    .winstreak-survivor-ring-shell {
+      min-width: min(640px, 96vw);
+      min-height: 110px;
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      gap: 18px;
+      align-items: center;
+      padding: 14px 18px 14px 14px;
+      border-radius: 22px;
+      background:
+        linear-gradient(180deg, rgba(16, 15, 22, 0.98), rgba(8, 9, 13, 0.96)),
+        radial-gradient(circle at 18% 42%, rgba(158,110,255,0.14), transparent 24%);
+      border: 1px solid rgba(255,255,255,0.06);
+      box-shadow: 0 18px 42px rgba(0,0,0,0.34);
+      position: relative;
+      overflow: hidden;
+      animation: winstreakRise 420ms cubic-bezier(.22,.9,.28,1) both;
+    }
+
+    .winstreak-survivor-ring-shell::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 42%;
+      background: linear-gradient(90deg, rgba(126,72,216,0.18), rgba(255,255,255,0));
+      pointer-events: none;
+      filter: blur(2px);
+      animation: ringSweep 3.6s ease-in-out infinite;
+    }
+
+    .winstreak-survivor-ring-icon {
+      display: grid;
+      place-items: center;
+    }
+
+    .survivor-emblem-ring {
+      width: 76px;
+      height: 76px;
+      background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.04), rgba(18,16,24,0.96));
+      border: 1px solid rgba(182,149,255,0.18);
+      box-shadow:
+        0 0 0 10px rgba(141, 99, 230, 0.12),
+        0 0 0 18px rgba(141, 99, 230, 0.05),
+        0 10px 24px rgba(0,0,0,0.28);
+      animation: ringPulse 2.7s ease-in-out infinite;
+    }
+
+    .winstreak-survivor-ring-copy {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .winstreak-survivor-ring-top {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+
+    .winstreak-survivor-ring-count {
+      color: #fff;
+      font-size: clamp(40px, 6vw, 68px);
+      line-height: 1;
+      font-weight: 900;
+      letter-spacing: 0.02em;
+      text-shadow: 0 0 18px rgba(141,99,230,0.12);
+    }
+
+    .winstreak-survivor-ring-word {
+      color: rgba(255,255,255,0.78);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+    }
+
+    .winstreak-survivor-ring-bottom {
+      display: grid;
+      grid-template-columns: 1fr 138px;
+      gap: 14px;
+      align-items: center;
+    }
+
+    .winstreak-survivor-ring-progress {
+      height: 10px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(255,255,255,0.06);
+    }
+
+    .winstreak-survivor-ring-progress-fill {
+      width: 64%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #965df2, #b88cff);
+      box-shadow: 0 0 18px rgba(150,93,242,0.24);
+      animation: ringFill 3.2s ease-in-out infinite;
+    }
+
+    .winstreak-survivor-ring-side {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: flex-end;
+      justify-content: center;
+      text-align: right;
+      min-width: 0;
+    }
+
+    .winstreak-survivor-ring-wr,
+    .winstreak-survivor-ring-best {
+      padding: 4px 0;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.74);
+      white-space: nowrap;
+    }
+
+    .winstreak-survivor-ring-wr {
+      color: #d9c1ff;
+    }
+
+    @keyframes ringPulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 10px rgba(141,99,230,0.12), 0 0 0 18px rgba(141,99,230,0.05), 0 10px 24px rgba(0,0,0,0.28); }
+      50% { transform: scale(1.02); box-shadow: 0 0 0 12px rgba(141,99,230,0.18), 0 0 0 20px rgba(141,99,230,0.07), 0 12px 28px rgba(0,0,0,0.30); }
+    }
+
+    @keyframes ringFill {
+      0%, 100% { transform: translateX(0); opacity: 0.9; }
+      50% { transform: translateX(8px); opacity: 1; }
+    }
+
+    @keyframes ringSweep {
+      0%, 100% { transform: translateX(-4%); opacity: 0.62; }
+      50% { transform: translateX(10%); opacity: 0.92; }
+    }
+
+    .winstreak-survivor-progress-shell {
+      min-width: min(760px, 96vw);
+      min-height: 126px;
+      display: grid;
+      grid-template-columns: 126px 1fr;
+      gap: 18px;
+      align-items: center;
+      padding: 16px 20px 16px 16px;
+      border-radius: 22px;
+      background:
+        linear-gradient(180deg, rgba(12, 13, 16, 0.96), rgba(8, 9, 12, 0.94)),
+        radial-gradient(circle at 18% 50%, rgba(184, 152, 255, 0.10), transparent 24%);
+      border: 1px solid rgba(255,255,255,0.07);
+      box-shadow: 0 18px 42px rgba(0,0,0,0.34);
+      position: relative;
+      overflow: hidden;
+      animation: winstreakRise 420ms cubic-bezier(.22,.9,.28,1) both;
+    }
+
+    .winstreak-survivor-progress-shell::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, rgba(255,255,255,0.03), transparent 18%, rgba(185,146,255,0.05) 58%, transparent 80%);
+      pointer-events: none;
+    }
+
+    .winstreak-survivor-progress-ring {
+      width: 114px;
+      height: 114px;
+      position: relative;
+      display: grid;
+      place-items: center;
+      margin-left: 4px;
+    }
+
+    .winstreak-survivor-progress-ring svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+      overflow: visible;
+      position: relative;
+      z-index: 0;
+    }
+
+    .winstreak-survivor-progress-track {
+      fill: none;
+      stroke: rgba(255,255,255,0.08);
+      stroke-width: 6;
+    }
+
+    .winstreak-survivor-progress-fill {
+      fill: none;
+      stroke: url(#survivorProgressGradient);
+      stroke-width: 6;
+      stroke-linecap: round;
+      filter: drop-shadow(0 0 10px rgba(147,111,255,0.28));
+      transition: stroke-dashoffset 900ms cubic-bezier(.22,.9,.28,1);
+      will-change: stroke-dashoffset;
+    }
+
+    .winstreak-progress {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      margin: 8px 0;
+    }
+
+    .winstreak-progress-track {
+      flex: 1;
+      height: 8px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .winstreak-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #0ea5a4, #06b6d4);
+      border-radius: 4px;
+      transition: width 800ms cubic-bezier(.22,.9,.28,1);
+      will-change: width;
+      box-shadow: 0 0 12px rgba(14, 165, 164, 0.4);
+    }
+
+    .survivor-emblem-progress {
+      position: absolute;
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.04), rgba(14,15,18,0.98));
+      border: 1px solid rgba(255,255,255,0.07);
+      box-shadow: 0 0 0 8px rgba(147, 111, 255, 0.08), 0 8px 22px rgba(0,0,0,0.26);
+      animation: progressPulse 3s ease-in-out infinite;
+      z-index: 1;
+    }
+
+    .winstreak-survivor-progress-ring-glow {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(150, 105, 255, 0.18) 0%, rgba(150, 105, 255, 0.08) 36%, transparent 68%);
+      filter: blur(12px);
+      opacity: 0.8;
+      animation: progressGlow 2.8s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    .winstreak-survivor-progress-copy {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .winstreak-survivor-progress-topline {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .winstreak-survivor-progress-count {
+      color: #fff;
+      font-size: clamp(40px, 6vw, 68px);
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: 0.03em;
+      text-shadow: 0 0 18px rgba(147,111,255,0.12);
+    }
+
+    .winstreak-survivor-progress-word {
+      color: rgba(255,255,255,0.72);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+    }
+
+    .winstreak-survivor-progress-side {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 8px;
+      min-width: 0;
+      margin-top: 2px;
+    }
+
+    .winstreak-survivor-progress-best {
+      color: rgba(255,255,255,0.62);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .winstreak-survivor-progress-wr {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      color: #d3b2ff;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    @keyframes progressPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.015); }
+    }
+
+    @keyframes progressGlow {
+      0%, 100% { opacity: 0.66; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.04); }
+    }
+
+    .winstreak-content {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .winstreak-topline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-width: 0;
+      font-size: 11px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--overlay-muted);
+    }
+
+    .winstreak-killer-name {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .winstreak-wincon {
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(var(--appearance-border-rgb, 118,197,182), calc(0.16 * var(--overlay-bg-alpha)));
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(6px);
+      white-space: nowrap;
+    }
+
+    .winstreak-mode-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.03);
+      font-size: 10px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .winstreak-mode-label .mode-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent-3);
+      box-shadow: 0 0 14px rgba(118,197,182,0.55);
+    }
+
+    .winstreak-badges {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      margin-left: 8px;
+    }
+
+    .winstreak-outs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .winstreak-out-pill {
+      padding: 5px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(118, 197, 182, calc(0.16 * var(--overlay-bg-alpha)));
+      background: rgba(255,255,255,0.03);
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .survivor-out-pill {
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(255,255,255,0.03);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: var(--overlay-text);
+      text-transform: none;
+      min-width: 34px;
+      text-align: center;
+    }
+
+    .exit-gate-icon {
+      width: 20px;
+      height: 20px;
+      object-fit: contain;
+      margin-right: 6px;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.45));
+    }
+
+    .winstreak-badge {
+      padding: 5px 8px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--overlay-text);
+      background: linear-gradient(90deg, rgba(0,0,0,0.12), rgba(255,255,255,0.02));
+      border: 1px solid rgba(var(--appearance-border-rgb, 255,255,255), calc(0.04 * var(--overlay-bg-alpha)));
+      box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+      transform-origin: center bottom;
+      transform: translateY(8px) scale(0.92);
+      opacity: 0;
+      animation: badgePop 420ms cubic-bezier(.22,.9,.28,1) forwards;
+      transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .winstreak-badge.pb {
+      background: linear-gradient(90deg, rgba(127,149,255,0.16), rgba(118,197,182,0.08));
+      border: 1px solid rgba(var(--appearance-border-rgb2, 127,149,255), calc(0.22 * var(--overlay-bg-alpha)));
+      box-shadow: 0 8px 28px rgba(127,149,255,0.08);
+    }
+
+    .winstreak-badge.wr {
+      background: linear-gradient(90deg, rgba(155,131,255,0.12), rgba(255,179,126,0.06));
+      border: 1px solid rgba(var(--appearance-border-rgb, 155,131,255), calc(0.18 * var(--overlay-bg-alpha)));
+      box-shadow: 0 8px 28px rgba(155,131,255,0.06);
+    }
+
+    /* medal icon inside badge */
+    .winstreak-badge .badge-icon { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; margin-right:6px; }
+    .winstreak-badge .badge-icon svg { width:18px; height:18px; display:block; }
+    .winstreak-badge.pb { color: var(--silver-1); }
+    .winstreak-badge.pb .badge-icon svg { filter: drop-shadow(0 6px 12px rgba(170,184,255,0.12)); }
+    .winstreak-badge.wr { color: var(--gold-1); }
+    .winstreak-badge.wr .badge-icon svg { filter: drop-shadow(0 8px 18px rgba(255,184,77,0.12)); }
+
+    /* shine animation overlay */
+    .winstreak-badge .badge-shine {
+      position: absolute;
+      top: 0; bottom: 0; left: -40%; width: 40%;
+      background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.22), rgba(255,255,255,0));
+      transform: skewX(-18deg) translateX(0);
+      pointer-events: none;
+      mix-blend-mode: overlay;
+      opacity: 0.9;
+      animation: badgeShine 1.6s ease-in-out infinite;
+    }
+
+    @keyframes badgeShine {
+      0% { transform: skewX(-18deg) translateX(-120%); }
+      50% { transform: skewX(-18deg) translateX(120%); }
+      100% { transform: skewX(-18deg) translateX(360%); }
+    }
+
+    @keyframes badgePop {
+      0% { transform: translateY(8px) scale(0.88); opacity: 0; }
+      60% { transform: translateY(-6px) scale(1.05); opacity: 1; }
+      100% { transform: translateY(0) scale(1); opacity: 1; }
+    }
+
+    /* Hover microinteraction for badges */
+    .winstreak-badge:hover {
+      transform: translateY(-2px) scale(1.06);
+      box-shadow: 0 14px 36px rgba(0,0,0,0.5);
+    }
+
+    /* Motion reduction */
+    @media (prefers-reduced-motion: reduce) {
+      .winstreak-badge,
+      body,
+      .overlay-shell {
+        animation: none !important;
+        transition: none !important;
+      }
+      .winstreak-badge { transform: none; opacity: 1; }
+    }
+
+    /* Overlay transition animations: leave + enter (crossfade + slide + subtle blur) */
+    .overlay-leave {
+      animation: overlayLeave 260ms ease-in forwards;
+    }
+
+    .overlay-enter {
+      animation: overlayEnterIn 320ms cubic-bezier(.22,.9,.28,1) forwards;
+    }
+
+    @keyframes overlayLeave {
+      0% { opacity: 1; transform: translateY(0) scale(1); filter: none; }
+      100% { opacity: 0; transform: translateY(-8px) scale(0.996); filter: blur(4px) saturate(0.9); }
+    }
+
+    @keyframes overlayEnterIn {
+      0% { opacity: 0; transform: translateY(8px) scale(0.992); filter: blur(6px) saturate(0.9); }
+      100% { opacity: 1; transform: translateY(0) scale(1); filter: none; }
+    }
+
+    .winstreak-statline {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .winstreak-count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(40px, 6.5vw, 72px);
+      line-height: 1;
+      font-weight: 700;
+      letter-spacing: 4px;
+      color: var(--overlay-text);
+      text-shadow: 0 0 24px rgba(118, 197, 182, 0.18);
+      transform: translateY(-3px);
+    }
+
+    .winstreak-label {
+      font-size: 12px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--overlay-muted);
+    }
+
+    .winstreak-variant-fire .winstreak-fire-shell,
+    .winstreak-variant-dark .winstreak-dark-layout,
+    .winstreak-variant-ember .winstreak-ember-layout {
+      position: relative;
+      overflow: hidden;
+      animation: winstreakRise 420ms cubic-bezier(.22,.9,.28,1) both;
+    }
+
+    .winstreak-fire-shell {
+      min-width: min(860px, 96vw);
+      min-height: 104px;
+      padding: 14px 18px;
+      border-radius: 22px;
+      background:
+        radial-gradient(circle at 8% 48%, rgba(255,126,52,0.34), transparent 22%),
+        radial-gradient(circle at 18% 50%, rgba(255,88,34,0.18), transparent 28%),
+        radial-gradient(circle at 58% 36%, rgba(255,143,41,0.10), transparent 28%),
+        linear-gradient(180deg, rgba(14,10,8,0.94), rgba(7,7,8,0.96));
+      border: 1px solid rgba(255, 140, 70, 0.16);
+      box-shadow: 0 18px 44px rgba(0,0,0,0.34), inset 0 0 0 1px rgba(255,255,255,0.03);
+    }
+
+    .winstreak-fire-layer,
+    .winstreak-fire-sparks {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .fire-layer-1 {
+      background: radial-gradient(circle at 16% 50%, rgba(255,150,40,0.55), transparent 16%),
+                  radial-gradient(circle at 28% 58%, rgba(255,97,34,0.42), transparent 20%);
+      filter: blur(10px);
+      animation: firePulse 2.2s ease-in-out infinite;
+      opacity: 0.72;
+    }
+
+    .fire-layer-2 {
+      background: radial-gradient(circle at 14% 52%, rgba(255,200,94,0.26), transparent 14%),
+                  radial-gradient(circle at 64% 18%, rgba(255,145,48,0.16), transparent 16%),
+                  radial-gradient(circle at 76% 68%, rgba(255,104,31,0.12), transparent 18%);
+      filter: blur(18px);
+      animation: fireDrift 4.8s ease-in-out infinite;
+      opacity: 0.65;
+    }
+
+    .fire-layer-3 {
+      background: linear-gradient(90deg, transparent 0%, rgba(255,98,27,0.07) 18%, transparent 34%, rgba(255,196,75,0.10) 54%, transparent 72%, rgba(255,98,27,0.08) 100%);
+      mix-blend-mode: screen;
+      opacity: 0.55;
+      animation: fireSweep 5.8s linear infinite;
+    }
+
+    .winstreak-fire-sparks::before,
+    .winstreak-fire-sparks::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        radial-gradient(circle, rgba(255,210,120,0.96) 0 1px, transparent 1.8px),
+        radial-gradient(circle, rgba(255,114,41,0.9) 0 1.5px, transparent 2.2px);
+      background-size: 76px 76px, 108px 108px;
+      background-position: 0 0, 20px 36px;
+      opacity: 0.34;
+      filter: blur(0.2px);
+      animation: fireSparks 2.6s linear infinite;
+    }
+
+    .winstreak-fire-sparks::after {
+      background-size: 120px 120px, 84px 84px;
+      background-position: 40px 10px, 0 48px;
+      opacity: 0.22;
+      animation-duration: 3.8s;
+      animation-direction: reverse;
+    }
+
+    .winstreak-fire-main {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      min-height: 76px;
+    }
+
+    .winstreak-fire-model {
+      width: 84px;
+      height: 84px;
+      border-radius: 18px;
+      overflow: hidden;
+      flex-shrink: 0;
+      border: 1px solid rgba(255,140,70,0.20);
+      background: radial-gradient(circle at 35% 20%, rgba(255,137,49,0.22), transparent 34%), rgba(255,255,255,0.03);
+      box-shadow: 0 12px 28px rgba(0,0,0,0.34);
+      animation: fireModelFloat 4.8s ease-in-out infinite;
+    }
+
+    .winstreak-fire-model .winstreak-model {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .winstreak-fire-model .winstreak-model img {
+      object-fit: contain;
+      padding: 6px;
+      transform: scale(1.1);
+    }
+
+    .winstreak-fire-copy {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 4px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .winstreak-fire-count-wrap {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .winstreak-fire-count {
+      font-size: clamp(42px, 7vw, 76px);
+      font-weight: 900;
+      line-height: 1;
+      color: #fff;
+      text-shadow: 0 0 30px rgba(255,129,45,0.18);
+      animation: fireCount 1.7s ease-in-out infinite;
+    }
+
+    .winstreak-fire-word {
+      font-size: 12px;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: #ff8a3a;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+
+    .winstreak-fire-name {
+      font-size: clamp(14px, 2vw, 24px);
+      font-weight: 800;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: #ff8a3a;
+      text-shadow: 0 0 16px rgba(255, 125, 39, 0.18);
+      animation: titleGlow 4.5s ease-in-out infinite;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .winstreak-fire-badges {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .winstreak-variant-dark .winstreak-dark-layout {
+      min-width: min(720px, 96vw);
+      min-height: 106px;
+      display: grid;
+      grid-template-columns: 104px 1fr;
+      gap: 18px;
+      align-items: center;
+      padding: 16px;
+      border-radius: 20px;
+      background: linear-gradient(180deg, rgba(22,22,24,0.96), rgba(12,12,14,0.94));
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 18px 40px rgba(0,0,0,0.34);
+    }
+
+    .winstreak-dark-model {
+      width: 100px;
+      height: 100px;
+      display: grid;
+      place-items: center;
+    }
+
+    .winstreak-dark-model .winstreak-model {
+      width: 100px;
+      height: 100px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .winstreak-dark-copy {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .winstreak-dark-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .winstreak-dark-kicker,
+    .winstreak-ember-top {
+      font-size: 10px;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      font-weight: 800;
+      color: rgba(255,255,255,0.46);
+    }
+
+    .winstreak-dark-wincon {
+      font-size: 10px;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.36);
+    }
+
+    .winstreak-dark-name,
+    .winstreak-ember-name {
+      color: #fff;
+      font-size: clamp(24px, 4vw, 42px);
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .winstreak-dark-count-row {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+
+    .winstreak-dark-count {
+      color: #fff;
+      font-size: clamp(36px, 6vw, 64px);
+      line-height: 1;
+      font-weight: 900;
+      letter-spacing: 0.05em;
+    }
+
+    .winstreak-dark-label,
+    .winstreak-ember-label {
+      color: rgba(255,255,255,0.42);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+    }
+
+    .winstreak-dark-bar {
+      width: min(360px, 100%);
+      height: 11px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      overflow: hidden;
+    }
+
+    .winstreak-dark-bar-fill {
+      width: 42%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, rgba(255,255,255,0.14), rgba(255,255,255,0.38));
+      animation: darkBarPulse 2.8s ease-in-out infinite;
+    }
+
+    .winstreak-dark-badges,
+    .winstreak-ember-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .winstreak-variant-ember .winstreak-ember-layout {
+      min-width: min(920px, 96vw);
+      min-height: 116px;
+      display: grid;
+      grid-template-columns: 1fr 168px;
+      gap: 16px;
+      align-items: center;
+      padding: 18px 20px;
+      border-radius: 24px;
+      background:
+        linear-gradient(90deg, rgba(14, 14, 16, 0.96), rgba(14, 14, 16, 0.90)),
+        radial-gradient(circle at 18% 38%, rgba(255,150,58,0.14), transparent 26%);
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 18px 42px rgba(0,0,0,0.34);
+    }
+
+    .winstreak-ember-copy {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .winstreak-ember-stats {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+
+    .winstreak-ember-count {
+      color: #fff;
+      font-size: clamp(48px, 8vw, 84px);
+      line-height: 1;
+      font-weight: 900;
+      letter-spacing: 0.06em;
+      text-shadow: 0 0 24px rgba(255,129,45,0.18);
+      animation: fireCount 2s ease-in-out infinite;
+    }
+
+    .winstreak-ember-model {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+    }
+
+    .winstreak-ember-model .winstreak-model {
+      width: 150px;
+      height: 150px;
+      border-radius: 22px;
+      background: radial-gradient(circle at 30% 25%, rgba(255,145,43,0.12), transparent 36%), rgba(255,255,255,0.02);
+    }
+
+    .winstreak-ember-model .winstreak-model img {
+      transform: scale(1.06);
+    }
+
+    @keyframes firePulse {
+      0%, 100% { opacity: 0.62; transform: translateY(0) scale(1); }
+      50% { opacity: 0.92; transform: translateY(-2px) scale(1.03); }
+    }
+
+    @keyframes firePulse {
+      0%, 100% { opacity: 0.62; transform: translateY(0) scale(1); }
+      50% { opacity: 0.92; transform: translateY(-2px) scale(1.03); }
+    }
+
+    @keyframes fireDrift {
+      0%, 100% { transform: translateX(0) translateY(0); }
+      50% { transform: translateX(10px) translateY(-2px); }
+    }
+
+    @keyframes fireSweep {
+      0% { transform: translateX(-18%); }
+      100% { transform: translateX(18%); }
+    }
+
+    @keyframes fireSparks {
+      0% { transform: translateY(12px); }
+      100% { transform: translateY(-12px); }
+    }
+
+    @keyframes fireModelFloat {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-3px) rotate(-1deg); }
+    }
+
+    @keyframes fireCount {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+    }
+
+    @keyframes darkBarPulse {
+      0%, 100% { opacity: 0.64; transform: translateX(0); }
+      50% { opacity: 1; transform: translateX(4px); }
+    }
+
+    .winstreak-variant-pill .winstreak-pill-shell,
+    .winstreak-variant-card .winstreak-card-layout,
+    .winstreak-variant-banner .winstreak-banner {
+      position: relative;
+      overflow: hidden;
+      animation: winstreakRise 420ms cubic-bezier(.22,.9,.28,1) both;
+    }
+
+    .winstreak-pill-shell {
+      min-width: min(720px, 94vw);
+      padding: 8px;
+      border-radius: 999px;
+      background:
+        radial-gradient(circle at 18% 22%, rgba(245,197,24,0.22), transparent 28%),
+        radial-gradient(circle at 78% 72%, rgba(118,197,182,0.18), transparent 34%),
+        linear-gradient(180deg, rgba(12, 12, 16, 0.98), rgba(6, 6, 8, 0.94));
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 18px 44px rgba(0,0,0,0.34), inset 0 0 0 1px rgba(255,255,255,0.03);
+    }
+
+    .winstreak-pill-glow {
+      position: absolute;
+      inset: -2px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(245,197,24,0.08), rgba(118,197,182,0.15), rgba(245,197,24,0.08));
+      filter: blur(20px);
+      opacity: 0.8;
+      animation: pillGlow 3.8s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    .winstreak-pill-wincon {
+      position: absolute;
+      top: 10px;
+      right: 18px;
+      z-index: 2;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.42);
+    }
+
+    .winstreak-pill-main {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-height: 58px;
+      padding: 4px 10px 4px 4px;
+    }
+
+    .winstreak-model {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      position: relative;
+      flex-shrink: 0;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+      background:
+        radial-gradient(circle at 30% 20%, rgba(245,197,24,0.24), transparent 35%),
+        rgba(255,255,255,0.04);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.38), inset 0 0 0 1px rgba(255,255,255,0.03);
+      animation: modelFloat 4.2s ease-in-out infinite;
+    }
+
+    .winstreak-model::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      box-shadow: inset 0 0 0 1px rgba(245,197,24,0.12), inset 0 -10px 24px rgba(0,0,0,0.18);
+      pointer-events: none;
+    }
+
+    .winstreak-model img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+      transform: scale(1.08);
+      filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.35));
+      animation: modelBob 5.2s ease-in-out infinite;
+    }
+
+    .winstreak-model.fallback {
+      display: grid;
+      place-items: center;
+    }
+
+    .winstreak-pill-copy {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .winstreak-pill-name {
+      color: #fff;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      line-height: 1.1;
+      text-shadow: 0 0 18px rgba(255,255,255,0.08);
+      animation: titleGlow 4.5s ease-in-out infinite;
+    }
+
+    .winstreak-pill-count-row {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .winstreak-pill-count {
+      color: #fff;
+      font-size: 20px;
+      font-weight: 900;
+      letter-spacing: 0.02em;
+      line-height: 1;
+    }
+
+    .winstreak-pill-label {
+      color: #7e7e7e;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .winstreak-pill-divider {
+      width: 1px;
+      height: 28px;
+      background: linear-gradient(180deg, transparent, rgba(255,255,255,0.14), transparent);
+      flex-shrink: 0;
+    }
+
+    .winstreak-pill-badges {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      min-width: 0;
+    }
+
+    .winstreak-card-layout {
+      min-width: min(760px, 94vw);
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 18px;
+      align-items: center;
+      padding: 16px;
+      border-radius: 28px;
+      background:
+        radial-gradient(circle at 20% 18%, rgba(245,197,24,0.18), transparent 28%),
+        radial-gradient(circle at 78% 80%, rgba(118,197,182,0.16), transparent 30%),
+        linear-gradient(180deg, rgba(14, 16, 22, 0.96), rgba(8, 10, 14, 0.94));
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 18px 42px rgba(0,0,0,0.34);
+    }
+
+    .winstreak-card-name,
+    .winstreak-banner-name {
+      color: #fff;
+      font-size: clamp(26px, 4.8vw, 44px);
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .winstreak-card-count {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      color: #fff;
+      font-size: clamp(40px, 7vw, 74px);
+      font-weight: 900;
+      line-height: 0.95;
+      letter-spacing: 0.04em;
+    }
+
+    .winstreak-card-count span,
+    .winstreak-banner-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.5);
+    }
+
+    .winstreak-card-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .winstreak-banner {
+      min-width: min(920px, 96vw);
+      display: grid;
+      grid-template-columns: 1fr 180px;
+      gap: 18px;
+      align-items: center;
+      padding: 18px 20px;
+      border-radius: 26px;
+      background:
+        linear-gradient(90deg, rgba(10, 12, 16, 0.96), rgba(10, 12, 16, 0.82)),
+        radial-gradient(circle at 20% 30%, rgba(245,197,24,0.12), transparent 26%),
+        radial-gradient(circle at 76% 72%, rgba(118,197,182,0.14), transparent 28%);
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 18px 42px rgba(0,0,0,0.34);
+    }
+
+    .winstreak-banner-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .winstreak-banner-stats {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .winstreak-banner-count {
+      color: #fff;
+      font-size: clamp(48px, 8vw, 88px);
+      font-weight: 900;
+      line-height: 0.95;
+      letter-spacing: 0.05em;
+    }
+
+    @keyframes pillGlow {
+      0%, 100% { opacity: 0.72; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.01); }
+    }
+
+    @keyframes modelFloat {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-3px) rotate(-1deg); }
+    }
+
+    @keyframes modelBob {
+      0%, 100% { transform: translateY(0) scale(1.08); }
+      50% { transform: translateY(-2px) scale(1.12); }
+    }
+
+    @keyframes titleGlow {
+      0%, 100% { text-shadow: 0 0 14px rgba(255,255,255,0.06); }
+      50% { text-shadow: 0 0 18px rgba(245,197,24,0.12); }
+    }
+
+    @keyframes winstreakRise {
+      from { opacity: 0; transform: translateY(8px) scale(0.985); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+  </style>
+</head>
+<body>
+  <div id="overlay-root">
+    <div class="resize-handle edge-n"></div>
+    <div class="resize-handle edge-s"></div>
+    <div class="resize-handle edge-e"></div>
+    <div class="resize-handle edge-w"></div>
+    <div class="resize-handle corner-ne"></div>
+    <div class="resize-handle corner-nw"></div>
+    <div class="resize-handle corner-se"></div>
+    <div class="resize-handle corner-sw"></div>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+
+    const overlayTypeArg = process.argv.find(arg => arg.startsWith('--overlay-type=')) || '--overlay-type=maps';
+    const overlayType = overlayTypeArg.split('=')[1] || 'maps';
+
+    const state = {
+      type: overlayType,
+      data: null,
+      overlayState: null,
+    };
+
+    let userUiScale = 1;
+    let dpiScaleFactor = 1;
+
+    function applyOverlayUiScale() {
+      const effectiveScale = Number(userUiScale || 1) * Number(dpiScaleFactor || 1);
+      document.documentElement.style.setProperty('--ui-scale', String(effectiveScale));
+    }
+
+    applyOverlayUiScale();
+
+    ipcRenderer.on('ui-scale-changed', (event, scale) => {
+      const next = Number(scale) || 1;
+      if (!Number.isFinite(next) || next <= 0) return;
+      userUiScale = next;
+      applyOverlayUiScale();
+    });
+
+    ipcRenderer.on('dpi-scale-changed', (event, scale) => {
+      const next = Number(scale) || 1;
+      if (!Number.isFinite(next) || next <= 0) return;
+      dpiScaleFactor = next;
+      applyOverlayUiScale();
+    });
+
+    ipcRenderer.on('overlay-data', (event, payload) => {
+      try {
+        if (payload && payload.type && payload.type !== state.type) return;
+        // Keep overlay state separate from render payload so state-only updates
+        // do not wipe the data the renderer needs.
+        if (payload && Object.prototype.hasOwnProperty.call(payload, 'state')) {
+          state.overlayState = payload.state;
+        }
+        if (payload && Object.prototype.hasOwnProperty.call(payload, 'data')) {
+          state.data = payload.data;
+        } else if (payload && (Object.prototype.hasOwnProperty.call(payload, 'ladder') || Object.prototype.hasOwnProperty.call(payload, 'winstreak') || Object.prototype.hasOwnProperty.call(payload, 'fourvone') || Object.prototype.hasOwnProperty.call(payload, 'maps') || Object.prototype.hasOwnProperty.call(payload, 'queue'))) {
+          state.data = payload;
+        }
+        render();
+      } catch (err) {
+        console.error('overlay-data handler failed', err);
+      }
+    });
+
+    function toFileUrl(value) {
+      if (!value) return '';
+      if (/^(https?:|file:)/i.test(value)) return value;
+      const normalized = value.replace(/\\/g, '/');
+      return normalized.startsWith('/') ? `file://${normalized}` : `file:///${normalized}`;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    function hashString(value) {
+      const input = String(value || '0');
+      let hash = 0;
+      for (let i = 0; i < input.length; i += 1) {
+        hash = ((hash << 5) - hash) + input.charCodeAt(i);
+        hash |= 0;
+      }
+      return Math.abs(hash);
+    }
+
+    function makeAvatarDataUri(seedText, seedValue) {
+      const seed = String(seedValue || seedText || '0');
+      const hue = hashString(seed) % 360;
+      const hue2 = (hue + 42) % 360;
+      const initial = escapeHtml(String(seedText || '?').trim().charAt(0).toUpperCase() || '?');
+      const svg = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+          <defs>
+            <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="hsl(${hue} 70% 45%)"/>
+              <stop offset="100%" stop-color="hsl(${hue2} 65% 28%)"/>
+            </linearGradient>
+          </defs>
+          <rect width="96" height="96" rx="48" fill="url(#g)"/>
+          <circle cx="48" cy="48" r="31" fill="rgba(255,255,255,0.08)"/>
+          <text x="48" y="58" text-anchor="middle" font-family="Arial, sans-serif" font-size="32" font-weight="700" fill="#fff">${initial}</text>
+        </svg>
+      `;
+      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    }
+
+
+    function timerClass(section) {
+      if (!section || !section.timerRunning) return 'timer';
+      if (section.timerSeconds <= 10) return 'timer danger';
+      if (section.timerSeconds <= 30) return 'timer warning';
+      return 'timer running';
+    }
+
+    function formatTime(seconds) {
+      const minutes = Math.floor(seconds / 60).toString().padStart(2, '0');
+      const remaining = (seconds % 60).toString().padStart(2, '0');
+      return `${minutes}:${remaining}`;
+    }
+
+    function formatMillisDynamic(ms) {
+      const total = Math.max(0, Math.floor(Number(ms) || 0));
+      const cs = Math.floor((total % 1000) / 10);
+      const secs = Math.floor(total / 1000) % 60;
+      const mins = Math.floor(total / 60000);
+      const cs2 = String(cs).padStart(2, '0');
+
+      if (mins > 0) {
+        return `${mins}:${String(secs).padStart(2, '0')}.${cs2}`;
+      }
+
+      return `${secs}.${cs2}`;
+    }
+
+    function getData() {
+      return state.data || {};
+    }
+
+    function renderMaps() {
+      const data = getData();
+      const maps = data.maps || {};
+      const selected = (maps.list || [])[maps.selectedIndex] || (maps.list || [])[0] || {};
+      const imageSrc = toFileUrl(selected.image || '');
+      
+      const mapNamesHtml = (maps.list || [])
+        .map(map => `<div class="map-list-item">${escapeHtml(map.name)}</div>`)
+        .join('');
+
+      return `
+        <section class="overlay-shell ov-maps">
+          <div class="safe-zone"></div>
+          <div class="preview-hud" id="preview-hud" style="display:none">
+            <button class="ph-btn" id="ph-toggle-preview">Toggle Preview</button>
+            <button class="ph-btn" id="ph-screenshot">Screenshot</button>
+          </div>
+          <div class="maps-stage">
+            <div class="maps-image-wrapper" style="position: relative; width: 100%; height: 100%;">
+              <img id="maps-img" class="maps-image" src="${imageSrc}" alt="Map preview" />
+              <div class="maps-image-fade"></div>
+              <div class="maps-image-handle handle-tl" data-handle="tl"></div>
+              <div class="maps-image-handle handle-tm" data-handle="tm"></div>
+              <div class="maps-image-handle handle-tr" data-handle="tr"></div>
+              <div class="maps-image-handle handle-ml" data-handle="ml"></div>
+              <div class="maps-image-handle handle-mr" data-handle="mr"></div>
+              <div class="maps-image-handle handle-bl" data-handle="bl"></div>
+              <div class="maps-image-handle handle-bm" data-handle="bm"></div>
+              <div class="maps-image-handle handle-br" data-handle="br"></div>
+            </div>
+            <div class="maps-overlay">
+            </div>
+          </div>
+        </section>
+      `;
+    }
+
+    function renderOnevone() {
+      const data = getData();
+      const onevone = data.onevone || {};
+      const player1Name = onevone.player1Name || 'Player 1';
+      const player2Name = onevone.player2Name || 'Player 2';
+      const player1Score = Number(onevone.player1Score || 0);
+      const player2Score = Number(onevone.player2Score || 0);
+      const player1Time = formatMillisDynamic(onevone.player1ElapsedMs ?? onevone.player1Seconds * 1000);
+      const player2Time = formatMillisDynamic(onevone.player2ElapsedMs ?? onevone.player2Seconds * 1000);
+      const activeTimer = Number(onevone.activeTimer || 1) === 2 ? 2 : 1;
+      const timerRunning = !!onevone.timerRunning;
+      const activeLabel = activeTimer === 2 ? player2Name : player1Name;
+      const p1Elapsed = Number(onevone.player1ElapsedMs ?? onevone.player1Seconds * 1000) || 0;
+      const p2Elapsed = Number(onevone.player2ElapsedMs ?? onevone.player2Seconds * 1000) || 0;
+      const activeElapsed = activeTimer === 2 ? p2Elapsed : p1Elapsed;
+      const otherElapsed = activeTimer === 2 ? p1Elapsed : p2Elapsed;
+      const warningWindowMs = 1500;
+      const delta = Math.abs(activeElapsed - otherElapsed);
+      const isCrossoverWarning = timerRunning && delta <= warningWindowMs;
+      const activeTimerClass = [
+        'onevone-side-timer',
+        activeTimer === 1 && timerRunning && !isCrossoverWarning ? 'running' : '',
+        activeTimer === 2 && timerRunning && !isCrossoverWarning ? 'running' : '',
+        isCrossoverWarning ? 'warning' : '',
+      ].filter(Boolean).join(' ');
+      const activeSideClass = (side) => {
+        const classes = ['onevone-side'];
+        if (timerRunning && activeTimer === side && !isCrossoverWarning) classes.push('running');
+        if (isCrossoverWarning && activeTimer === side) classes.push('warning');
+        return classes.join(' ');
+      };
+
+      return `
+        <section class="overlay-shell ov-onevone">
+          <div class="safe-zone"></div>
+          <div class="onevone-container">
+            <div class="onevone-board">
+              <div class="onevone-head">
+                <div class="onevone-name">${escapeHtml(player1Name)}</div>
+                <div class="onevone-score-pill">${escapeHtml(String(player1Score))} - ${escapeHtml(String(player2Score))}</div>
+                <div class="onevone-name right">${escapeHtml(player2Name)}</div>
+              </div>
+              <div class="onevone-row">
+                <div class="${activeSideClass(1)}">
+                  <div class="${activeTimer === 1 ? activeTimerClass : 'onevone-side-timer'} ${isCrossoverWarning && activeTimer === 1 ? 'fade-out' : ''}">${escapeHtml(player1Time)}</div>
+                </div>
+                <div class="${activeSideClass(2)}">
+                  <div class="${activeTimer === 2 ? activeTimerClass : 'onevone-side-timer'} ${isCrossoverWarning && activeTimer === 2 ? 'fade-out' : ''}">${escapeHtml(player2Time)}</div>
+                </div>
+              </div>
+              <div class="onevone-footer">
+                <span>${escapeHtml(timerRunning ? `Currently running: ${activeLabel}` : 'Paused')}</span>
+                <span>${escapeHtml(onevone.player1Finished ? 'P1 done' : 'P1 live')} / ${escapeHtml(onevone.player2Finished ? 'P2 done' : 'P2 live')}</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      `;
+    }
+
+    function renderFourvone() {
+      const data = getData();
+      const fourvone = data.fourvone || {};
+      const style = String(fourvone.style || 'default').toLowerCase();
+      const teams = (fourvone.teams || []);
+      const killer = fourvone.killerName || fourvone.selectedKiller || 'Unknown';
+      const killerImage = fourvone.killerImage || '';
+      const killerIcon = fourvone.killerIcon || '◌';
+      const opponentTeam = teams[0]?.name || 'Team';
+      const latestWincon = (fourvone.latestWincon || '').trim();
+      const stages = (fourvone.lastStages || '').trim();
+      const freshes = (fourvone.lastFreshes || '').trim();
+      const setLabel = (fourvone.setLabel || '').trim();
+      const currentSet = Number(fourvone.currentSet || 0);
+      const totalSets = Number(fourvone.totalSets || 0);
+      const nextSetKiller = (fourvone.nextSetKiller || '').trim();
+      const stageFreshText = stages || freshes ? `${stages || '-'} stages / ${freshes || '-'} freshes` : '';
+      const setsLeft = totalSets > 0 && currentSet > 0 ? Math.max(totalSets - currentSet, 0) : 0;
+      const setsLeftText = totalSets > 0 ? `${setsLeft} set${setsLeft === 1 ? '' : 's'} left` : '';
+
+      if (!killer && !latestWincon && !stages && !freshes && !setLabel && !currentSet && !totalSets) {
+        return `
+          <section class="overlay-shell ov-fourvone ov-fourvone-empty">
+            <div class="safe-zone"></div>
+            <div class="overlay-empty-card overlay-empty-animated">
+              <div class="overlay-empty-svg" aria-hidden="true">
+                <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="32" cy="32" r="27" fill="none" stroke="currentColor" stroke-width="4" opacity="0.18"/>
+                  <path d="M20 22h24l-4 20H24l-4-20z" fill="currentColor" opacity="0.9"/>
+                  <path d="M26 26h12l-2 10H28l-2-10z" fill="#0ea5a4" opacity="0.9"/>
+                </svg>
+              </div>
+              <div class="overlay-empty-title">Scrim Overlay</div>
+              <div class="overlay-empty-subtitle">Waiting for live match data</div>
+            </div>
+          </section>
+        `;
+      }
+      
+      // compute wincon needed to win
+      function computeWinconNeeded(latest, stg, fr) {
+        if (!latest) {
+          // fallback to stages/freshes fields
+          const s = parseInt(stg || '', 10);
+          const f = parseInt(fr || '', 10);
+          if (!isNaN(s) && !isNaN(f)) return `${s}stg${f + 1}f`;
+          return '';
+        }
+        const m = latest.match(/^(\d+)k(\d+)$/i);
+        if (m) {
+          const a = parseInt(m[1], 10);
+          const b = parseInt(m[2], 10);
+          if (!isNaN(a) && !isNaN(b)) return `${a}k${b + 1}`;
+        }
+        const m2 = latest.match(/^(\d+)stg(\d+)f$/i);
+        if (m2) {
+          const a = parseInt(m2[1], 10);
+          const b = parseInt(m2[2], 10);
+          if (!isNaN(a) && !isNaN(b)) return `${a}stg${b + 1}f`;
+        }
+        return '';
+      }
+
+      const winconNeeded = computeWinconNeeded(latestWincon, stages, freshes);
+
+      const defaultLayout = `
+        <section class="overlay-shell ov-fourvone">
+          <div class="safe-zone"></div>
+          <div class="preview-hud" id="preview-hud" style="display:none">
+            <button class="ph-btn" id="ph-toggle-preview">Toggle Preview</button>
+            <button class="ph-btn" id="ph-screenshot">Screenshot</button>
+          </div>
+          <div class="fourvone-wrap">
+            <div class="scrim-art anim-fade-up anim-fade-up-del1">
+              ${killerImage ? `<img src="${escapeHtml(killerImage)}" alt="${escapeHtml(killer)}" />` : `<div class="scrim-art-fallback">${escapeHtml(killerIcon)}</div>`}
+            </div>
+            <div class="scrim-content">
+              ${setLabel ? `
+              <div class="scrim-label-row anim-fade-up anim-fade-up-del2">
+                <div class="scrim-setlabel">${escapeHtml(setLabel)}</div>
+              </div>
+              ` : ''}
+              <div class="scrim-matchup anim-fade-up anim-fade-up-del2">${escapeHtml(killer)} vs ${escapeHtml(opponentTeam)}</div>
+              <div class="anim-fade-up anim-fade-up-del2">
+                <div style="display:flex;align-items:center;gap:12px;">
+                  <div class="scrim-wincon">next set ${escapeHtml(nextSetKiller || '-')}</div>
+                  ${ (currentSet && totalSets) ? `<div class="scrim-detail" data-tooltip="Sets left: ${setsLeft}">${escapeHtml(currentSet)}/${escapeHtml(totalSets)}</div>` : '' }
+                </div>
+              </div>
+              <div class="scrim-meta anim-fade-up anim-fade-up-del3">
+                ${latestWincon ? `<div class="scrim-detail">latest result ${escapeHtml(latestWincon)}</div>` : ''}
+                ${stageFreshText ? `<div class="scrim-detail">${escapeHtml(stageFreshText)}</div>` : ''}
+                ${winconNeeded ? `<div class="scrim-detail">wincon needed ${escapeHtml(winconNeeded)}</div>` : ''}
+              </div>
+            </div>
+          </div>
+        </section>
+      `;
+
+      const glassLayout = `
+        <section class="overlay-shell ov-fourvone ov-fourvone-glass">
+          <div class="safe-zone"></div>
+          <div class="preview-hud" id="preview-hud" style="display:none">
+            <button class="ph-btn" id="ph-toggle-preview">Toggle Preview</button>
+            <button class="ph-btn" id="ph-screenshot">Screenshot</button>
+          </div>
+          <div class="fourvone-glass-wrap">
+            <div class="fourvone-glass-smoke" aria-hidden="true"></div>
+            <div class="fourvone-glass-inner">
+              <div class="fourvone-glass-left">
+                <div class="fourvone-glass-image">
+                  ${killerImage ? `<img src="${escapeHtml(killerImage)}" alt="${escapeHtml(killer)}" />` : `<div class="fourvone-glass-icon">${escapeHtml(killerIcon)}</div>`}
+                </div>
+              </div>
+              <div class="fourvone-glass-right">
+                <div class="fourvone-glass-title">${escapeHtml(killer)} vs ${escapeHtml(opponentTeam)}</div>
+                ${setLabel ? `<div class="fourvone-glass-label">${escapeHtml(setLabel)}</div>` : ''}
+                <div class="fourvone-glass-detail">
+                  <div class="fourvone-glass-detail-item">
+                    <span class="label">NEXT SET</span>
+                    <span class="value">${escapeHtml(nextSetKiller || '-')}</span>
+                  </div>
+                  ${(currentSet && totalSets) ? `<div class="fourvone-glass-detail-item"><span class="label">SETS</span><span class="value">${escapeHtml(currentSet)}/${escapeHtml(totalSets)}</span></div>` : ''}
+                </div>
+                ${latestWincon || stageFreshText || winconNeeded ? `
+                <div class="fourvone-glass-meta">
+                  ${latestWincon ? `<div class="fourvone-glass-meta-item">Latest <strong>${escapeHtml(latestWincon)}</strong></div>` : ''}
+                  ${stageFreshText ? `<div class="fourvone-glass-meta-item">${escapeHtml(stageFreshText)}</div>` : ''}
+                  ${winconNeeded ? `<div class="fourvone-glass-meta-item">Needed <strong>${escapeHtml(winconNeeded)}</strong></div>` : ''}
+                </div>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+        </section>
+      `;
+
+      return style === 'glass' ? glassLayout : defaultLayout;
+    }
+
+    function renderWinstreak() {
+      const data = getData();
+      const winstreak = data.winstreak || {};
+      const survivorMode = winstreak.mode === 'survivor';
+      const style = survivorMode
+        ? String(winstreak.survivorStyle || 'minimal').toLowerCase()
+        : String(winstreak.style || 'fire').toLowerCase();
+      const killer = winstreak.selectedKiller || 'Unknown';
+      const killerName = winstreak.killerName || killer;
+      const killerImage = winstreak.killerImage || '';
+      const killerIcon = winstreak.killerIcon || '◌';
+      const survivor = winstreak.survivor || {};
+      const survivorWins = Number(survivor.gamesWon ?? 0);
+      const survivorPb = survivor.pb || '';
+      const survivorWr = survivor.worldRecord || '';
+      const survivorOuts = [
+        { n: 2, value: Number(survivor.twoOut ?? 0) },
+        { n: 3, value: Number(survivor.threeOut ?? 0) },
+        { n: 4, value: Number(survivor.fourOut ?? 0) },
+      ];
+      const highestOut = survivorOuts.slice().reverse().find(it => it.value > 0) || null;
+      const survivorOutLabel = highestOut ? `${highestOut.n}+` : '';
+      const wincon = winstreak.wincon || '2k+';
+      const gamesWon = Number(winstreak.gamesWon ?? 0);
+      const pb = winstreak.pb || '';
+      const worldRecord = winstreak.worldRecord || '';
+      const killerProgressTarget = Math.max(0, Number(pb || 0));
+      const killerProgressPercent = killerProgressTarget > 0 ? Math.min((gamesWon / killerProgressTarget) * 100, 100) : 0;
+
+      if (!survivorMode && !killerName && !gamesWon && !pb && !worldRecord) {
+        return `
+          <section class="overlay-shell ov-winstreak winstreak-empty">
+            <div class="safe-zone"></div>
+            <div class="overlay-empty-card overlay-empty-animated">
+              <div class="overlay-empty-svg" aria-hidden="true">
+                <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="11" y="11" width="42" height="42" rx="12" fill="none" stroke="currentColor" stroke-width="4" opacity="0.18"/>
+                  <path d="M32 15l9 17H23l9-17z" fill="currentColor" opacity="0.9"/>
+                  <path d="M25 35h14l-3 10H28l-3-10z" fill="#0ea5a4" opacity="0.9"/>
+                </svg>
+              </div>
+              <div class="overlay-empty-title">Winstreak Overlay</div>
+              <div class="overlay-empty-subtitle">Waiting for streak stats</div>
+            </div>
+          </section>
+        `;
+      }
+
+      const killerModel = killerImage
+        ? `<div class="winstreak-model"><img src="${escapeHtml(killerImage)}" alt="${escapeHtml(killerName)}" /></div>`
+        : `<div class="winstreak-model fallback"><div class="winstreak-art-fallback">${escapeHtml(killerIcon)}</div></div>`;
+
+      const killerBadges = `
+        ${pb ? `<div class="winstreak-badge pb"><span class="badge-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 2l3.1 5.9 6.4.9-4.6 4 1.1 6.4L12 17.8 6 19.1l1.1-6.4L2.6 8.7l6.4-.9L12 2z" fill="currentColor"/></svg></span><span class="badge-label">PB ${escapeHtml(pb)}</span><span class="badge-shine" aria-hidden="true"></span></div>` : ''}
+        ${worldRecord ? `<div class="winstreak-badge wr"><span class="badge-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="12" cy="10" r="5" fill="currentColor"/><path d="M8 3 L12 9 L16 3" fill="currentColor" opacity="0.18"/></svg></span><span class="badge-label">WR ${escapeHtml(worldRecord)}</span><span class="badge-shine" aria-hidden="true"></span></div>` : ''}
+      `;
+
+      const survivorMinimal = `
+        <section class="overlay-shell ov-winstreak winstreak-variant-survivor winstreak-survivor-minimal">
+          <div class="safe-zone"></div>
+          <div class="preview-hud" id="preview-hud" style="display:none">
+            <button class="ph-btn" id="ph-toggle-preview">Toggle Preview</button>
+            <button class="ph-btn" id="ph-screenshot">Screenshot</button>
+          </div>
+          <div class="winstreak-wrap">
+            <div class="winstreak-art winstreak-art-survivor">
+              <div class="survivor-emblem" aria-hidden="true">
+                <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Survivor emblem">
+                  <path d="M32 10c-9.4 0-17 7.6-17 17 0 14 17 27 17 27s17-13 17-27c0-9.4-7.6-17-17-17zm0 24a7 7 0 1 1 0-14 7 7 0 0 1 0 14z" fill="currentColor" opacity="0.92"/>
+                  <circle cx="18" cy="18" r="4" fill="currentColor" opacity="0.55"/>
+                  <circle cx="46" cy="18" r="4" fill="currentColor" opacity="0.55"/>
+                  <circle cx="20" cy="48" r="3.5" fill="currentColor" opacity="0.45"/>
+                  <circle cx="44" cy="48" r="3.5" fill="currentColor" opacity="0.45"/>
+                </svg>
+              </div>
+            </div>
+            <div class="winstreak-content">
+              <div class="winstreak-topline">
+                <div style="flex:1"></div>
+                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    ${survivorOutLabel ? `<img src="file:///c:/Users/Admin/Downloads/stream-overlay-app/stream-overlay-app/assets/winstreak/Exit%20Gate.png" class="exit-gate-icon" alt="Exit Gate"/> <div class="survivor-out-pill">${escapeHtml(survivorOutLabel)}</div>` : ''}
+                    <div class="winstreak-wincon">${escapeHtml(survivorPb ? `PB ${survivorPb}` : 'PB -')}</div>
+                  </div>
+                  <div class="winstreak-badges">
+                    ${survivorWr ? `<div class="winstreak-badge wr"><span class="badge-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="12" cy="10" r="5" fill="currentColor"/><path d="M8 3 L12 9 L16 3" fill="currentColor" opacity="0.18"/></svg></span><span class="badge-label">WR ${escapeHtml(survivorWr)}</span><span class="badge-shine" aria-hidden="true"></span></div>` : ''}
+                  </div>
+                </div>
+              </div>
+              <div class="winstreak-statline">
+                <div class="winstreak-count">${survivorWins}</div>
+                <div class="winstreak-label">Streak</div>
+              </div>
+            </div>
+          </div>
+        </section>
+      `;
+
+      const survivorCompact = `
+        <section class="overlay-shell ov-winstreak winstreak-variant-survivor winstreak-survivor-compact">
+          <div class="safe-zone"></div>
+          <div class="winstreak-survivor-compact-shell">
+            <div class="winstreak-survivor-badge">
+              <div class="survivor-emblem survivor-emblem-compact" aria-hidden="true">
+                <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Survivor emblem">
+                  <path d="M32 10c-9.4 0-17 7.6-17 17 0 14 17 27 17 27s17-13 17-27c0-9.4-7.6-17-17-17zm0 24a7 7 0 1 1 0-14 7 7 0 0 1 0 14z" fill="currentColor" opacity="0.92"/>
+                  <circle cx="18" cy="18" r="4" fill="currentColor" opacity="0.55"/>
+                  <circle cx="46" cy="18" r="4" fill="currentColor" opacity="0.55"/>
+                  <circle cx="20" cy="48" r="3.5" fill="currentColor" opacity="0.45"/>
+                  <circle cx="44" cy="48" r="3.5" fill="currentColor" opacity="0.45"/>
+                </svg>
+              </div>
+            </div>
+            <div class="winstreak-survivor-copy">
+              <div class="winstreak-survivor-top">SURVIVOR STREAK</div>
+              <div class="winstreak-survivor-count-row">
+                <div class="winstreak-survivor-count">${survivorWins}</div>
+                <div class="winstreak-survivor-word">STREAK</div>
+              </div>
+              <div class="winstreak-survivor-meta">${escapeHtml(survivorPb ? `PB ${survivorPb}` : 'PB -')}</div>
+            </div>
+            <div class="winstreak-survivor-badge-right">
+              ${survivorWr ? `<div class="winstreak-badge wr"><span class="badge-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="12" cy="10" r="5" fill="currentColor"/><path d="M8 3 L12 9 L16 3" fill="currentColor" opacity="0.18"/></svg></span><span class="badge-label">WR ${escapeHtml(survivorWr)}</span><span class="badge-shine" aria-hidden="true"></span></div>` : ''}
+              ${survivorOutLabel ? `<div class="winstreak-survivor-out">${escapeHtml(survivorOutLabel)}</div>` : ''}
+            </div>
+          </div>
+        </section>
+      `;
+
+      const survivorGlow = `
+        <section class="overlay-shell ov-winstreak winstreak-variant-survivor winstreak-survivor-glow">
+          <div class="safe-zone"></div>
+          <div class="winstreak-survivor-glow-shell">
+            <div class="winstreak-survivor-glow-dot" aria-hidden="true"></div>
+            <div class="winstreak-survivor-glow-copy">
+              <div class="winstreak-survivor-glow-top">SURVIVOR RUN</div>
+              <div class="winstreak-survivor-glow-count-row">
+                <div class="winstreak-survivor-glow-count">${survivorWins}</div>
+                <div class="winstreak-survivor-glow-label">STREAK</div>
+              </div>
+              <div class="winstreak-survivor-glow-bar">
+                <div class="winstreak-survivor-glow-fill"></div>
+              </div>
+              <div class="winstreak-survivor-glow-meta">
+                <div class="winstreak-survivor-glow-pill">${escapeHtml(survivorPb ? `PB ${survivorPb}` : 'PB -')}</div>
+                ${survivorWr ? `<div class="winstreak-survivor-glow-pill highlight">WR ${escapeHtml(survivorWr)}</div>` : ''}
+              </div>
+            </div>
+          </div>
+        </section>
+      `;
+
+      const survivorRing = `
+        <section class="overlay-shell ov-winstreak winstreak-variant-survivor winstreak-survivor-ring">
+          <div class="safe-zone"></div>
+          <div class="winstreak-survivor-ring-shell">
+            <div class="winstreak-survivor-ring-icon">
+              <div class="survivor-emblem survivor-emblem-ring" aria-hidden="true">
+                <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Survivor emblem">
+                  <path d="M32 10c-9.4 0-17 7.6-17 17 0 14 17 27 17 27s17-13 17-27c0-9.4-7.6-17-17-17zm0 24a7 7 0 1 1 0-14 7 7 0 0 1 0 14z" fill="currentColor" opacity="0.92"/>
+                  <circle cx="18" cy="18" r="4" fill="currentColor" opacity="0.55"/>
+                  <circle cx="46" cy="18" r="4" fill="currentColor" opacity="0.55"/>
+                  <circle cx="20" cy="48" r="3.5" fill="currentColor" opacity="0.45"/>
+                  <circle cx="44" cy="48" r="3.5" fill="currentColor" opacity="0.45"/>
+                </svg>
+              </div>
+            </div>
+            <div class="winstreak-survivor-ring-copy">
+              <div class="winstreak-survivor-ring-top">
+                <div class="winstreak-survivor-ring-count">${survivorWins}</div>
+                <div class="winstreak-survivor-ring-word">Streak</div>
+              </div>
+              <div class="winstreak-survivor-ring-bottom">
+                <div class="winstreak-survivor-ring-progress">
+                  <div class="winstreak-survivor-ring-progress-fill"></div>
+                </div>
+                <div class="winstreak-survivor-ring-side">
+                  ${survivorWr ? `<div class="winstreak-survivor-ring-wr">WR ${escapeHtml(survivorWr)}</div>` : ''}
+                  <div class="winstreak-survivor-ring-best">BEST ${escapeHtml(survivorPb || '0')}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      `;
+
+      const survivorProgress = (() => {
+        const pbTarget = Math.max(0, Number(survivorPb || 0));
+        const percent = pbTarget > 0 ? Math.min((survivorWins / pbTarget) * 100, 100) : 0;
+        const progressLabel = pbTarget > 0 ? `BEST ${pbTarget}` : 'BEST -';
+        const wrLabel = survivorWr ? `WR ${survivorWr}` : '';
+        const radius = 44;
+        const circumference = (2 * Math.PI * radius).toFixed(3);
+        return `
+          <section class="overlay-shell ov-winstreak winstreak-variant-survivor winstreak-survivor-progress">
+            <div class="safe-zone"></div>
+            <div class="winstreak-survivor-progress-shell">
+              <div class="winstreak-survivor-progress-ring">
+                <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Survivor progress ring">
+                  <defs>
+                    <linearGradient id="survivorProgressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#8d5cff" />
+                      <stop offset="100%" stop-color="#d6c0ff" />
+                    </linearGradient>
+                  </defs>
+                  <circle class="winstreak-survivor-progress-track" cx="60" cy="60" r="${radius}" />
+                  <circle
+                    class="winstreak-survivor-progress-fill"
+                    cx="60"
+                    cy="60"
+                    r="${radius}"
+                    data-progress-target="${percent.toFixed(2)}"
+                    data-progress-circumference="${circumference}"
+                    style="stroke-dasharray: ${circumference}; stroke-dashoffset: ${circumference};"
+                  />
+                </svg>
+                <div class="survivor-emblem survivor-emblem-progress" aria-hidden="true">
+                  <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M32 10c-9.4 0-17 7.6-17 17 0 14 17 27 17 27s17-13 17-27c0-9.4-7.6-17-17-17zm0 24a7 7 0 1 1 0-14 7 7 0 0 1 0 14z" fill="currentColor" opacity="0.92"/>
+                    <circle cx="18" cy="18" r="4" fill="currentColor" opacity="0.55"/>
+                    <circle cx="46" cy="18" r="4" fill="currentColor" opacity="0.55"/>
+                    <circle cx="20" cy="48" r="3.5" fill="currentColor" opacity="0.45"/>
+                    <circle cx="44" cy="48" r="3.5" fill="currentColor" opacity="0.45"/>
+                  </svg>
+                </div>
+                <div class="winstreak-survivor-progress-ring-glow"></div>
+              </div>
+              <div class="winstreak-survivor-progress-copy">
+                <div class="winstreak-survivor-progress-topline">
+                  <div class="winstreak-survivor-progress-count">${survivorWins}</div>
+                  <div class="winstreak-survivor-progress-word">STREAK</div>
+                </div>
+                <div class="winstreak-survivor-progress-side">
+                  <div class="winstreak-survivor-progress-best">${escapeHtml(progressLabel)}</div>
+                  ${wrLabel ? `<div class="winstreak-survivor-progress-wr"><span class="badge-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="12" cy="10" r="5" fill="currentColor"/><path d="M8 3 L12 9 L16 3" fill="currentColor" opacity="0.18"/></svg></span><span class="badge-label">${escapeHtml(wrLabel)}</span></div>` : ''}
+                </div>
+              </div>
+            </div>
+          </section>
+        `;
+      })();
+
+      if (survivorMode) {
+        if (style === 'compact') return survivorCompact;
+        if (style === 'glow') return survivorGlow;
+        if (style === 'ring') return survivorRing;
+        if (style === 'progress') return survivorProgress;
+        return survivorMinimal;
+      }
+
+      if (style === 'dark') {
+        return `
+          <section class="overlay-shell ov-winstreak winstreak-variant-dark">
+            <div class="safe-zone"></div>
+            <div class="winstreak-dark-layout">
+              <div class="winstreak-dark-model">${killerModel}</div>
+              <div class="winstreak-dark-copy">
+                <div class="winstreak-dark-top">
+                  <div class="winstreak-dark-kicker">WINSTREAK</div>
+                  <div class="winstreak-dark-wincon">${escapeHtml(wincon)}</div>
+                </div>
+                <div class="winstreak-dark-name">${escapeHtml(killerName)}</div>
+                <div class="winstreak-dark-count-row">
+                  <div class="winstreak-dark-count">${gamesWon}</div>
+                  <div class="winstreak-dark-label">STREAK</div>
+                </div>
+                <div class="winstreak-progress">
+                  <div class="winstreak-progress-track"><div class="winstreak-progress-fill" data-progress-target="${killerProgressPercent.toFixed(2)}"></div></div>
+                </div>
+                <div class="winstreak-dark-badges">${killerBadges}</div>
+              </div>
+            </div>
+          </section>
+        `;
+      }
+
+      return `
+        <section class="overlay-shell ov-winstreak winstreak-variant-fire">
+          <div class="safe-zone"></div>
+          <div class="winstreak-fire-shell">
+            <div class="winstreak-fire-layer fire-layer-1" aria-hidden="true"></div>
+            <div class="winstreak-fire-layer fire-layer-2" aria-hidden="true"></div>
+            <div class="winstreak-fire-layer fire-layer-3" aria-hidden="true"></div>
+            <div class="winstreak-fire-sparks" aria-hidden="true"></div>
+            <div class="winstreak-fire-main">
+              <div class="winstreak-fire-model">${killerModel}</div>
+              <div class="winstreak-fire-copy">
+                <div class="winstreak-fire-count-wrap">
+                  <div class="winstreak-fire-count">${gamesWon}</div>
+                  <div class="winstreak-fire-word">STREAK</div>
+                </div>
+                <div class="winstreak-fire-name">${escapeHtml(killerName)}</div>
+                  <div class="winstreak-progress">
+                    <div class="winstreak-progress-track"><div class="winstreak-progress-fill" data-progress-target="${killerProgressPercent.toFixed(2)}"></div></div>
+                  </div>
+              </div>
+              <div class="winstreak-fire-badges">${killerBadges}</div>
+            </div>
+          </div>
+        </section>
+      `;
+    }
+
+    function renderLadder() {
+      return `
+        <section class="overlay-shell ov-ladder">
+          <div class="safe-zone"></div>
+          <div class="ladder-rework-shell">
+            <div class="ladder-rework-card" role="status" aria-live="polite">
+              <div class="ladder-rework-title">Under Rework</div>
+              <div class="ladder-rework-subtitle">This ladder overlay is currently being reworked. Check the VD OverlayTools Discord for more updates while we finish the new version.</div>
+              <div class="ladder-rework-pill">Animated placeholder active</div>
+            </div>
+          </div>
+        </section>
+      `;
+    }
+
+    function renderQueue() {
+      const data = getData();
+      const queue = data || {};
+      const title = queue.title || 'Queue';
+      const players = Array.isArray(queue.players) ? queue.players : [];
+      const visiblePlayers = players.slice(0, Math.max(1, Number(queue.maxVisible || 8)));
+      const message = queue.message || (queue.ok ? 'Queue is live.' : 'Queue data is unavailable.');
+      const count = Number(queue.count ?? players.length ?? 0);
+
+      const rows = visiblePlayers.length
+        ? visiblePlayers.map((player, index) => `
+            <div class="queue-row">
+              <div class="queue-row-name">${escapeHtml(player.name || `Player ${index + 1}`)}</div>
+              <div class="queue-row-index">${escapeHtml(String(player.index || index + 1))}</div>
+            </div>
+          `).join('')
+        : `<div class="queue-empty">${escapeHtml(queue.ok ? 'No one is in queue right now.' : message)}</div>`;
+
+      return `
+        <section class="overlay-shell ov-queue">
+          <div class="safe-zone"></div>
+          <div class="preview-hud" id="preview-hud" style="display:none">
+            <button class="ph-btn" id="ph-toggle-preview">Toggle Preview</button>
+            <button class="ph-btn" id="ph-screenshot">Screenshot</button>
+          </div>
+          <div class="queue-wrap">
+            <div class="queue-header">
+              <div>
+                <div class="queue-title">${escapeHtml(title)}</div>
+                <div class="queue-subtitle">NeatQueue live roster</div>
+              </div>
+              <div class="queue-count">${escapeHtml(String(count))}<span>Players</span></div>
+            </div>
+            <div class="queue-message">${escapeHtml(message)}</div>
+            <div class="queue-list">
+              ${rows}
+            </div>
+          </div>
+        </section>
+      `;
+    }
+
+    function render() {
+      const root = document.getElementById('overlay-root');
+      if (!root) return;
+      performRenderWithTransition(() => {
+        // Store resize handles before clearing
+        const resizeHandles = root.querySelectorAll('.resize-handle');
+        const handlesHTML = Array.from(resizeHandles).map(h => h.outerHTML).join('');
+
+        let html;
+        if (state.type === 'onevone') {
+          html = renderOnevone();
+        } else {
+          html = {
+            maps: renderMaps(),
+            fourvone: renderFourvone(),
+            queue: renderQueue(),
+            winstreak: renderWinstreak(),
+            ladder: renderLadder(),
+          }[state.type] || `<div class="overlay-shell overlay-empty">Overlay type unavailable</div>`;
+        }
+
+        root.innerHTML = html;
+        // Re-insert resize handles
+        if (handlesHTML) {
+          root.insertAdjacentHTML('beforeend', handlesHTML);
+        } else {
+          const handles = [
+            '<div class="resize-handle edge-n"></div>',
+            '<div class="resize-handle edge-s"></div>',
+            '<div class="resize-handle edge-e"></div>',
+            '<div class="resize-handle edge-w"></div>',
+            '<div class="resize-handle corner-ne"></div>',
+            '<div class="resize-handle corner-nw"></div>',
+            '<div class="resize-handle corner-se"></div>',
+            '<div class="resize-handle corner-sw"></div>',
+          ];
+          root.insertAdjacentHTML('beforeend', handles.join(''));
+        }
+      });
+      
+      // after DOM is rendered, initialize controls
+      initMapControls();
+      initResizeHandles();
+        initDragHandle();
+    }
+
+    // Perform a leave -> insert -> enter transition when re-rendering overlays
+    function performRenderWithTransition(renderFn) {
+      const root = document.getElementById('overlay-root');
+      if (!root) return;
+      renderFn();
+      const newShell = root.querySelector('.overlay-shell');
+      postRenderInit(newShell || null);
+    }
+
+    // After DOM insertion, apply staggered badge delays and any necessary inits
+    function postRenderInit(shell) {
+      // stagger badges
+      const badges = document.querySelectorAll('.winstreak-badges .winstreak-badge');
+      badges.forEach((b, i) => {
+        b.style.animationDelay = `${i * 100}ms`;
+        b.style.opacity = '';
+      });
+
+      const progressFills = document.querySelectorAll('[data-progress-target]');
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      progressFills.forEach(fill => {
+        const target = Number(fill.dataset.progressTarget || 0);
+        const circumference = Number(fill.dataset.progressCircumference || 0);
+        const widthTarget = fill.classList.contains('winstreak-progress-fill') ? target : null;
+        if (circumference > 0) {
+          fill.style.strokeDasharray = `${circumference}`;
+          fill.style.strokeDashoffset = `${circumference}`;
+        }
+        const targetOffset = circumference > 0 ? circumference - (target / 100) * circumference : 0;
+        if (reduceMotion) {
+          fill.style.transition = 'none';
+          fill.style.strokeDashoffset = `${targetOffset}`;
+          if (widthTarget !== null) fill.style.width = `${Math.max(0, Math.min(100, widthTarget))}%`;
+          return;
+        }
+        fill.style.strokeDashoffset = `${circumference}`;
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            fill.style.strokeDashoffset = `${targetOffset}`;
+            if (widthTarget !== null) fill.style.width = `${Math.max(0, Math.min(100, widthTarget))}%`;
+          });
+        });
+      });
+
+      // ensure other inits run
+      initMapControls();
+      initResizeHandles();
+      initDragHandle();
+      setupHudHandlers();
+      setupTooltips();
+    }
+
+    const mapControlState = {
+      bound: false,
+      activeHandle: null,
+      startX: 0,
+      startY: 0,
+      startWidth: 0,
+      startHeight: 0,
+      startLeft: 0,
+      startTop: 0,
+    };
+
+    const resizeState = {
+      bound: false,
+      active: null,
+      startX: 0,
+      startY: 0,
+      startWidth: 0,
+      startHeight: 0,
+      pendingWidth: 0,
+      pendingHeight: 0,
+      rafId: 0,
+    };
+
+    const dragState = { bound: false };
+
+    function initMapControls() {
+      if (mapControlState.bound) return;
+      mapControlState.bound = true;
+
+      document.addEventListener('mousedown', (e) => {
+        const handle = e.target.closest('.maps-image-handle');
+        if (!handle) return;
+        const img = document.getElementById('maps-img');
+        if (!img) return;
+
+        const rect = img.getBoundingClientRect();
+        mapControlState.activeHandle = handle.getAttribute('data-handle') || 'br';
+        mapControlState.startX = e.clientX;
+        mapControlState.startY = e.clientY;
+        mapControlState.startWidth = rect.width;
+        mapControlState.startHeight = rect.height;
+        mapControlState.startLeft = img.offsetLeft || 0;
+        mapControlState.startTop = img.offsetTop || 0;
+        e.preventDefault();
+      }, true);
+
+      document.addEventListener('mousemove', (e) => {
+        if (!mapControlState.activeHandle) return;
+        const img = document.getElementById('maps-img');
+        if (!img) return;
+
+        const dx = e.clientX - mapControlState.startX;
+        const dy = e.clientY - mapControlState.startY;
+
+        let newWidth = mapControlState.startWidth;
+        let newHeight = mapControlState.startHeight;
+
+        if (mapControlState.activeHandle.includes('l')) newWidth -= dx;
+        if (mapControlState.activeHandle.includes('r')) newWidth += dx;
+        if (mapControlState.activeHandle.includes('t')) newHeight -= dy;
+        if (mapControlState.activeHandle.includes('b')) newHeight += dy;
+
+        img.style.width = `${Math.max(120, Math.round(newWidth))}px`;
+        img.style.height = `${Math.max(80, Math.round(newHeight))}px`;
+      }, true);
+
+      document.addEventListener('mouseup', () => {
+        mapControlState.activeHandle = null;
+      }, true);
+    }
+
+    function initResizeHandles() {
+      if (resizeState.bound) return;
+      resizeState.bound = true;
+
+      document.addEventListener('mousedown', (e) => {
+        const handle = e.target.closest('.resize-handle');
+        if (!handle) return;
+
+        resizeState.active = handle.className || 'resize-handle corner-se';
+        resizeState.startX = e.clientX;
+        resizeState.startY = e.clientY;
+        resizeState.startWidth = window.innerWidth;
+        resizeState.startHeight = window.innerHeight;
+        e.preventDefault();
+      }, true);
+
+      document.addEventListener('mousemove', (e) => {
+        if (!resizeState.active) return;
+
+        const dx = e.clientX - resizeState.startX;
+        const dy = e.clientY - resizeState.startY;
+
+        let width = resizeState.startWidth;
+        let height = resizeState.startHeight;
+
+        if (resizeState.active.includes('edge-e') || resizeState.active.includes('corner-ne') || resizeState.active.includes('corner-se')) width += dx;
+        if (resizeState.active.includes('edge-w') || resizeState.active.includes('corner-nw') || resizeState.active.includes('corner-sw')) width -= dx;
+        if (resizeState.active.includes('edge-s') || resizeState.active.includes('corner-se') || resizeState.active.includes('corner-sw')) height += dy;
+        if (resizeState.active.includes('edge-n') || resizeState.active.includes('corner-ne') || resizeState.active.includes('corner-nw')) height -= dy;
+
+        resizeState.pendingWidth = Math.max(320, Math.round(width));
+        resizeState.pendingHeight = Math.max(180, Math.round(height));
+
+        if (!resizeState.rafId) {
+          resizeState.rafId = requestAnimationFrame(() => {
+            resizeState.rafId = 0;
+            if (!resizeState.active) return;
+            ipcRenderer.send('resize-overlay-window', resizeState.pendingWidth, resizeState.pendingHeight);
+          });
+        }
+      }, true);
+
+      document.addEventListener('mouseup', () => {
+        if (resizeState.active && resizeState.pendingWidth && resizeState.pendingHeight) {
+          ipcRenderer.send('resize-overlay-window', resizeState.pendingWidth, resizeState.pendingHeight);
+        }
+        if (resizeState.rafId) {
+          cancelAnimationFrame(resizeState.rafId);
+          resizeState.rafId = 0;
+        }
+        resizeState.active = null;
+      }, true);
+    }
+
+    function initDragHandle() {
+      if (dragState.bound) return;
+      dragState.bound = true;
+      // Native drag regions via CSS are smoother than JS-based window dragging.
+    }
+
+    // HUD button handlers (setup after first render)
+    function setupHudHandlers() {
+      const screenshotBtn = document.getElementById('ph-screenshot');
+      const toggleBtn = document.getElementById('ph-toggle-preview');
+
+      if (screenshotBtn && !screenshotBtn._handled) {
+        screenshotBtn._handled = true;
+        screenshotBtn.addEventListener('click', () => {
+          ipcRenderer.send('overlay-screenshot');
+        });
+      }
+
+      if (toggleBtn && !toggleBtn._handled) {
+        toggleBtn._handled = true;
+        toggleBtn.addEventListener('click', () => {
+          const now = document.body.classList.contains('preview-mode');
+          const next = !now;
+          ipcRenderer.send('ui-preview-mode', next);
+          setPreviewMode(next);
+        });
+      }
+    }
+
+    ipcRenderer.on('overlay-screenshot-saved', (event, file) => {
+      const btn = document.getElementById('ph-screenshot');
+      if (btn) {
+        btn.textContent = 'Saved ✓';
+        setTimeout(() => btn.textContent = 'Screenshot', 1200);
+      }
+    });
+
+    ipcRenderer.on('overlay-screenshot-failed', (event, err) => {
+      console.error('screenshot failed', err);
+      const btn = document.getElementById('ph-screenshot');
+      if (btn) {
+        btn.textContent = 'Failed ✗';
+        setTimeout(() => btn.textContent = 'Screenshot', 1600);
+      }
+    });
+
+    // Custom tooltip implementation: shows data-tooltip attributes
+    let _tooltipEl = null;
+    function ensureTooltip() {
+      if (_tooltipEl) return _tooltipEl;
+      _tooltipEl = document.createElement('div');
+      _tooltipEl.className = 'custom-tooltip';
+      document.body.appendChild(_tooltipEl);
+      return _tooltipEl;
+    }
+
+    function setupTooltips() {
+      const tooltip = ensureTooltip();
+      document.body.addEventListener('mouseover', (e) => {
+        const target = e.target.closest && e.target.closest('[data-tooltip]');
+        if (!target) return;
+        const txt = target.getAttribute('data-tooltip');
+        if (!txt) return;
+        tooltip.textContent = txt;
+        tooltip.classList.add('show');
+        positionTooltipFor(target, tooltip);
+      });
+      document.body.addEventListener('mouseout', (e) => {
+        const related = e.relatedTarget;
+        const leavingFrom = e.target.closest && e.target.closest('[data-tooltip]');
+        if (!leavingFrom) return;
+        // hide tooltip
+        if (tooltip) tooltip.classList.remove('show');
+      });
+      document.body.addEventListener('mousemove', (e) => {
+        if (!(_tooltipEl && _tooltipEl.classList.contains('show'))) return;
+        const t = document.elementFromPoint(e.clientX, e.clientY);
+        const ttTarget = t && t.closest && t.closest('[data-tooltip]');
+        if (!ttTarget) return;
+        positionTooltipFor(ttTarget, _tooltipEl);
+      });
+    }
+
+    function positionTooltipFor(target, tooltip) {
+      const rect = target.getBoundingClientRect();
+      const tw = tooltip.offsetWidth;
+      const th = tooltip.offsetHeight;
+      // place above target when space allows, otherwise below
+      const aboveY = rect.top - th - 8;
+      const belowY = rect.bottom + 8;
+      const x = Math.min(Math.max(rect.left + (rect.width - tw)/2, 8), window.innerWidth - tw - 8);
+      const y = aboveY > 8 ? aboveY : (belowY + th < window.innerHeight ? belowY : Math.max(8, aboveY));
+      tooltip.style.left = `${x}px`;
+      tooltip.style.top = `${y}px`;
+    }
+
+    // Setup handlers after initial render and whenever render happens
+    const originalRender = render;
+    render = function() {
+      originalRender.call(this);
+      setupHudHandlers();
+      setupTooltips();
+    };
+
+    render();
+
+    // Toggle a body class when overlay background alpha is zero so borders/shadows can be removed
+    function updateTransparencyClass() {
+      try {
+        const raw = getComputedStyle(document.documentElement).getPropertyValue('--overlay-bg-alpha');
+        const n = parseFloat((raw || '').trim()) || 0;
+        if (n <= 0) {
+          document.body.classList.add('overlay-full-transparent');
+        } else {
+          document.body.classList.remove('overlay-full-transparent');
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    // run on startup and after renders
+    updateTransparencyClass();
+
+    // listen for IPC updates to alpha
+    ipcRenderer.on('overlay-set-alpha', (event, alpha) => {
+      try {
+        const v = Number(alpha) || 0;
+        document.documentElement.style.setProperty('--overlay-bg-alpha', String(v));
+        updateTransparencyClass();
+      } catch (e) {}
+    });
+
+    // minimal boxes mode is tied to transparency: handled in updateTransparencyClass()
+  </script>
+</body>
+</html>
+

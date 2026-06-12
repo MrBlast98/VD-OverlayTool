@@ -1,0 +1,105 @@
+{
+  "name": "vd-overlaytools",
+  "version": "1.0.3",
+  "description": "VD OverlayTools: Separate overlays for streamers. Clean, professional control.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MrBlast98/VD-OverlayTool"
+  },
+  "main": "src/main/main.js",
+  "homepage": "./",
+  "scripts": {
+    "build:renderer": "node scripts/build-renderer.mjs",
+    "start": "npm run build:renderer && electron .",
+    "test": "jest",
+    "dev": "npm run build:renderer && electron . --enable-logging",
+    "bot": "node bot/discord-key-bot.js",
+    "generate-keys": "node bot/generate-keys.js",
+    "supabase:db:push": "npx supabase db push",
+    "supabase:functions:deploy": "npx supabase functions deploy license-validate",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win --publish never",
+    "build:mac": "npm run build:renderer && electron-builder --mac --publish never",
+    "dist": "npm run build:renderer && npm run build:win"
+  },
+  "keywords": [
+    "electron",
+    "overlay",
+    "streaming",
+    "tournament"
+  ],
+  "author": "VD",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.38.0",
+    "discord.js": "^14.26.4",
+    "dotenv": "^17.4.2",
+    "electron-store": "^8.1.0",
+    "electron-updater": "^6.8.3",
+    "html2canvas": "^1.4.1",
+    "tesseract.js": "^7.0.0",
+    "uiohook-napi": "^1.5.5"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.13.3",
+    "esbuild": "^0.25.12",
+    "jest": "^29.6.1",
+    "supabase": "^2.98.2"
+  },
+  "build": {
+    "appId": "com.vd.overlaytools",
+    "productName": "VD OverlayTools",
+    "files": [
+      "src/main/**/*",
+      "src/shared/**/*",
+      "src/renderer/index.html",
+      "src/renderer/overlay.html",
+      "src/renderer/style.css",
+      "src/renderer/app.bundle.js",
+      "src/renderer/renderer-manifest.json",
+      "assets/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "buildResources": "assets"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "VD OverlayTools"
+    },
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    }
+  }
+}
