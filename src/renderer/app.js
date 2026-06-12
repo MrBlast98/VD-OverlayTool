@@ -902,9 +902,9 @@ function getWinstreakCatalog() {
 
 function createDefaultRulesets() {
   return [
-    { id: 'standard', name: 'Standard', description: 'Open tournament build with 4 perks and 2 items.', perkSlots: 4, itemSlots: 2, allowDuplicates: true },
-    { id: 'perk-only', name: 'Perk Only', description: 'Tournament set without items.', perkSlots: 4, itemSlots: 0, allowDuplicates: true },
-    { id: 'single-item', name: 'Single Item', description: 'One item, four perks, duplicate entries allowed.', perkSlots: 4, itemSlots: 1, allowDuplicates: true },
+    { id: 'standard', name: 'Standard', description: 'Standard 3-perk competitive ruleset.', perkSlots: 3, itemSlots: 1, allowDuplicates: true },
+    { id: 'perk-only', name: 'Perk Only', description: '3 perks, no items.', perkSlots: 3, itemSlots: 0, allowDuplicates: true },
+    { id: 'full-perks', name: 'Full Perks', description: '4 perks, 2 items (open tournament).', perkSlots: 4, itemSlots: 2, allowDuplicates: true },
   ];
 }
 
@@ -917,7 +917,7 @@ function createDefaultTournamentSets() {
 }
 
 function createDefaultWinstreakBuilds() {
-  return Array.from({ length: 4 }, (_, index) => ({
+  return Array.from({ length: 3 }, (_, index) => ({
     id: index + 1,
     name: `Build ${index + 1}`,
     role: 'survivor',
@@ -947,10 +947,10 @@ function normalizeWinstreakBuildEntry(entry, fallbackId) {
 function normalizeWinstreakBuildState(entry) {
   const source = entry && typeof entry === 'object' ? entry : {};
   const builds = Array.isArray(source.builds) && source.builds.length
-    ? source.builds.slice(0, 4).map((build, index) => normalizeWinstreakBuildEntry(build, index + 1))
+    ? source.builds.slice(0, 3).map((build, index) => normalizeWinstreakBuildEntry(build, index + 1))
     : createDefaultWinstreakBuilds();
 
-  while (builds.length < 4) {
+  while (builds.length < 3) {
     builds.push(normalizeWinstreakBuildEntry({}, builds.length + 1));
   }
 
@@ -1021,9 +1021,11 @@ function renderWinstreakBuildSlot(entryName, type, index) {
 }
 
 function renderWinstreakBuildRow(build, index, activeBuildId) {
-  const perkSlots = Array.from({ length: 4 }, (_, slotIndex) => renderWinstreakBuildSlot(build.perks[slotIndex], 'perk', slotIndex)).join('');
-  const itemSlots = Array.from({ length: 2 }, (_, slotIndex) => renderWinstreakBuildSlot(build.items[slotIndex], 'item', slotIndex)).join('');
   const ruleset = getBuildRuleset(build);
+  const perkCount = ruleset?.perkSlots || 3;
+  const itemCount = ruleset?.itemSlots || 1;
+  const perkSlots = Array.from({ length: perkCount }, (_, slotIndex) => renderWinstreakBuildSlot(build.perks[slotIndex], 'perk', slotIndex)).join('');
+  const itemSlots = Array.from({ length: itemCount }, (_, slotIndex) => renderWinstreakBuildSlot(build.items[slotIndex], 'item', slotIndex)).join('');
   const balance = getTournamentSet(build) || getSelectedWinstreakBalance();
 
   return `
