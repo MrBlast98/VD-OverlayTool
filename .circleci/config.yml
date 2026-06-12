@@ -1,0 +1,69 @@
+version: 2.1
+
+orbs:
+  win: circleci/windows@5.0
+
+parameters:
+  run-mac:
+    type: boolean
+    default: true
+
+workflows:
+  build:
+    jobs:
+      - build-windows:
+          filters:
+            tags:
+              only: /^v.*/
+      - build-mac:
+          filters:
+            tags:
+              only: /^v.*/
+
+jobs:
+  build-windows:
+    executor:
+      name: win/default
+      size: medium
+    steps:
+      - checkout
+      - run:
+          name: Build Windows
+          command: |
+            $nodeDir = "$env:ProgramFiles\nodejs"
+            if (-not (Test-Path "$nodeDir\node.exe")) {
+              Write-Host "Downloading Node.js 20..."
+              $url = "https://nodejs.org/dist/v20.18.0/node-v20.18.0-win-x64.zip"
+              $zip = "$env:TEMP\node.zip"
+              curl.exe -L -o $zip $url
+              Expand-Archive -Path $zip -DestinationPath "$env:TEMP\node"
+              if (Test-Path $nodeDir) { Remove-Item $nodeDir -Recurse -Force }
+              Move-Item "$env:TEMP\node\node-v20.18.0-win-x64" $nodeDir
+            }
+            $env:Path = "$nodeDir;$env:Path"
+            node -v
+            npm install
+            npm run build:renderer
+            npm run build:win
+      - store_artifacts:
+          path: dist/
+
+  build-mac:
+    macos:
+      xcode: 15.4
+    steps:
+      - checkout
+      - run:
+          name: Build macOS
+          command: |
+            version=$(node -v 2>/dev/null || echo "none")
+            if [ "$version" = "none" ]; then
+              brew install node@20
+              brew link --overwrite node@20
+            fi
+            node -v
+            npm install
+            npm run build:renderer
+            npm run build:mac
+      - store_artifacts:
+          path: dist/
