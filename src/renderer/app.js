@@ -5240,11 +5240,24 @@ function initTabs() {
   });
 }
 
+const _navOrder = ['dashboard','onevone','maps','fourvone','winstreak','ladder','stats','winstreak-builds','game-info','backgrounds','fonts','settings','credits'];
+
 function activateTab(tab, activeButton = document.querySelector(`[data-tab="${tab}"]`)) {
+  const prev = state.activeTab;
   document.querySelectorAll('.nav-btn').forEach(item => item.classList.remove('active'));
   activeButton?.classList.add('active');
   document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
-  document.getElementById(`tab-${tab}`)?.classList.add('active');
+  const panel = document.getElementById(`tab-${tab}`);
+  if (panel) {
+    panel.classList.add('active');
+    // Directional animation
+    panel.classList.remove('slide-left', 'slide-right');
+    const prevIdx = _navOrder.indexOf(prev);
+    const nextIdx = _navOrder.indexOf(tab);
+    if (prevIdx >= 0 && nextIdx >= 0) {
+      panel.classList.add(nextIdx > prevIdx ? 'slide-left' : 'slide-right');
+    }
+  }
   state.activeTab = tab;
 }
 
@@ -6847,3 +6860,460 @@ window.openVDL = openVDL;
 window.openVDR = openVDR;
 window.showMapPreviewModal = showMapPreviewModal;
 window.closeMapPreviewModal = closeMapPreviewModal;
+
+/* =============================================
+   POLISH UPGRADES — JS FEATURES
+   ============================================= */
+
+// Tab order for directional animation
+
+// --- 2. Toast notification system ---
+let _toastContainer = null;
+function ensureToastContainer() {
+  if (!_toastContainer) {
+    _toastContainer = document.createElement('div');
+    _toastContainer.className = 'toast-container';
+    document.body.appendChild(_toastContainer);
+  }
+  return _toastContainer;
+}
+function showToast(message, type = 'info', duration = 3500, action = null) {
+  const container = ensureToastContainer();
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  const icons = { success: '✓', error: '✕', info: '●' };
+  toast.innerHTML = `
+    <span class="toast-icon ${type}">${icons[type] || '●'}</span>
+    <span class="toast-body">${message}</span>
+    ${action ? `<button class="toast-action">${action.label}</button>` : ''}
+    <button class="toast-close">✕</button>
+  `;
+  container.appendChild(toast);
+  if (action) {
+    toast.querySelector('.toast-action')?.addEventListener('click', () => {
+      action.onClick();
+      toast.classList.add('exiting');
+      setTimeout(() => toast.remove(), 240);
+    });
+  }
+  toast.querySelector('.toast-close')?.addEventListener('click', () => {
+    toast.classList.add('exiting');
+    setTimeout(() => toast.remove(), 240);
+  });
+  if (duration > 0) {
+    setTimeout(() => {
+      if (toast.isConnected) {
+        toast.classList.add('exiting');
+        setTimeout(() => toast.remove(), 240);
+      }
+    }, duration);
+  }
+  return toast;
+}
+
+// --- 3. Number counting animation ---
+function animateCountUp(el, target, duration = 600) {
+  const start = performance.now();
+  const initial = parseFloat(el.textContent) || 0;
+  const delta = target - initial;
+  function tick(now) {
+    const t = Math.min((now - start) / duration, 1);
+    const eased = 1 - Math.pow(1 - t, 3);
+    el.textContent = Math.round(initial + delta * eased);
+    el.classList.add('pop');
+    if (t < 1) requestAnimationFrame(tick);
+    else setTimeout(() => el.classList.remove('pop'), 340);
+  }
+  requestAnimationFrame(tick);
+}
+
+// --- 4. Scroll-triggered animations ---
+let _scrollObserver = null;
+function initScrollAnimations() {
+  if (_scrollObserver) return;
+  _scrollObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        _scrollObserver.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+  document.querySelectorAll('.scroll-animate').forEach(el => _scrollObserver.observe(el));
+}
+function observeScrollAnimations() {
+  if (!_scrollObserver) initScrollAnimations();
+  document.querySelectorAll('.scroll-animate:not(.visible)').forEach(el => _scrollObserver.observe(el));
+}
+
+// --- 5. Particle system ---
+let _particleInterval = null;
+function startParticles(count = 20) {
+  stopParticles();
+  let container = document.getElementById('particle-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'particle-container';
+    container.className = 'particle-container';
+    container.style.display = 'none';
+    document.body.appendChild(container);
+  }
+  container.style.display = 'block';
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const size = 1 + Math.random() * 3;
+    p.style.width = size + 'px';
+    p.style.height = size + 'px';
+    p.style.left = Math.random() * 100 + '%';
+    p.style.animationDuration = (6 + Math.random() * 8) + 's';
+    p.style.animationDelay = (Math.random() * 10) + 's';
+    p.style.opacity = 0.2 + Math.random() * 0.3;
+    container.appendChild(p);
+  }
+}
+function stopParticles() {
+  if (_particleInterval) { clearInterval(_particleInterval); _particleInterval = null; }
+  const container = document.getElementById('particle-container');
+  if (container) { container.style.display = 'none'; container.innerHTML = ''; }
+}
+
+// --- 6. Custom cursor ---
+let _cursorEnabled = false;
+let _cursorEl = null;
+let _cursorDot = null;
+function toggleCustomCursor(enable) {
+  _cursorEnabled = enable;
+  document.body.classList.toggle('custom-cursor-enabled', enable);
+  if (enable) {
+    if (!_cursorEl) {
+      _cursorEl = document.createElement('div'); _cursorEl.id = 'custom-cursor';
+      _cursorDot = document.createElement('div'); _cursorDot.id = 'custom-cursor-dot';
+      document.body.appendChild(_cursorEl); document.body.appendChild(_cursorDot);
+    }
+    const move = (e) => {
+      _cursorEl.style.left = e.clientX + 'px'; _cursorEl.style.top = e.clientY + 'px';
+      _cursorDot.style.left = e.clientX + 'px'; _cursorDot.style.top = e.clientY + 'px';
+    };
+    const over = (e) => { if (e.target.closest('button,a,.btn,.nav-btn,.card')) _cursorEl.classList.add('hovering'); };
+    const out = () => _cursorEl.classList.remove('hovering');
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseover', over);
+    document.addEventListener('mouseout', out);
+    _cursorEl._cleanup = () => {
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseover', over);
+      document.removeEventListener('mouseout', out);
+    };
+  } else {
+    if (_cursorEl && _cursorEl._cleanup) _cursorEl._cleanup();
+    if (_cursorEl) { _cursorEl.remove(); _cursorEl = null; }
+    if (_cursorDot) { _cursorDot.remove(); _cursorDot = null; }
+  }
+}
+
+// --- 7. Skeleton loading helpers ---
+function showSkeleton(container, type = 'card', count = 3) {
+  if (!container) return;
+  container.innerHTML = '';
+  for (let i = 0; i < count; i++) {
+    const s = document.createElement('div');
+    if (type === 'card') s.className = 'skeleton skeleton-card';
+    else if (type === 'text') s.className = 'skeleton skeleton-text';
+    else if (type === 'title') s.className = 'skeleton skeleton-title';
+    else if (type === 'avatar') s.className = 'skeleton skeleton-avatar';
+    else s.className = 'skeleton';
+    container.appendChild(s);
+  }
+}
+function hideSkeleton(container, content) {
+  if (!container) return;
+  container.innerHTML = content || '';
+}
+
+// --- 8. Sidebar toggle ---
+function initSidebarToggle() {
+  let toggle = document.getElementById('sidebar-toggle');
+  if (!toggle) {
+    toggle = document.createElement('button');
+    toggle.id = 'sidebar-toggle';
+    toggle.innerHTML = '◀';
+    toggle.title = 'Toggle sidebar';
+    document.getElementById('sidebar')?.appendChild(toggle);
+  }
+  toggle.addEventListener('click', () => {
+    document.body.classList.toggle('sidebar-collapsed');
+    toggle.innerHTML = document.body.classList.contains('sidebar-collapsed') ? '▶' : '◀';
+  });
+}
+
+// --- 9. Command palette (Ctrl+K) ---
+let _commandPalette = null;
+function ensureCommandPalette() {
+  if (_commandPalette) return;
+  _commandPalette = document.createElement('div');
+  _commandPalette.className = 'command-overlay';
+  _commandPalette.innerHTML = `
+    <div class="command-palette">
+      <input class="command-input" placeholder="Search tabs, actions..." autofocus />
+      <div class="command-results"></div>
+    </div>
+  `;
+  _commandPalette.addEventListener('click', (e) => { if (e.target === _commandPalette) closeCommandPalette(); });
+  document.body.appendChild(_commandPalette);
+  const input = _commandPalette.querySelector('.command-input');
+  input.addEventListener('input', () => filterCommands(input.value));
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeCommandPalette();
+    if (e.key === 'ArrowDown') { e.preventDefault(); moveCommandSelection(1); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); moveCommandSelection(-1); }
+    if (e.key === 'Enter') { e.preventDefault(); executeCommandSelection(); }
+  });
+}
+const _commandItems = [
+  { label: 'Dashboard', tab: 'dashboard' },
+  { label: '1v1 Timer', tab: 'onevone' },
+  { label: 'Map Overlay', tab: 'maps' },
+  { label: 'Scrim Overlay', tab: 'fourvone' },
+  { label: 'Winstreak Overlay', tab: 'winstreak' },
+  { label: 'Ladder Overlay', tab: 'ladder' },
+  { label: 'Winstreak Stats', tab: 'stats' },
+  { label: 'Winstreak Builds', tab: 'winstreak-builds' },
+  { label: 'Wiki', tab: 'game-info' },
+  { label: 'Backgrounds', tab: 'backgrounds' },
+  { label: 'Fonts', tab: 'fonts' },
+  { label: 'Settings', tab: 'settings' },
+  { label: 'Credits', tab: 'credits' },
+  { label: 'Toggle Sidebar', action: () => document.getElementById('sidebar-toggle')?.click() },
+];
+let _commandSelectionIdx = -1;
+function openCommandPalette() {
+  ensureCommandPalette();
+  _commandPalette.classList.add('open');
+  const input = _commandPalette.querySelector('.command-input');
+  input.value = '';
+  input.focus();
+  filterCommands('');
+}
+function closeCommandPalette() {
+  if (!_commandPalette) return;
+  _commandPalette.classList.remove('open');
+}
+function filterCommands(query) {
+  const results = _commandPalette.querySelector('.command-results');
+  const q = query.toLowerCase();
+  const filtered = _commandItems.filter(item => item.label.toLowerCase().includes(q));
+  if (filtered.length === 0) {
+    results.innerHTML = '<div class="command-empty">No results found</div>';
+    _commandSelectionIdx = -1;
+    return;
+  }
+  results.innerHTML = filtered.map((item, i) =>
+    `<div class="command-item${i === 0 ? ' selected' : ''}" data-idx="${i}">
+      <span>${item.label}</span>
+      ${item.tab ? '<span class="shortcut-hint">Tab</span>' : ''}
+    </div>`
+  ).join('');
+  _commandSelectionIdx = 0;
+  results.querySelectorAll('.command-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const idx = parseInt(el.dataset.idx);
+      const item = filtered[idx];
+      if (item) executeCommand(item);
+    });
+  });
+}
+function moveCommandSelection(dir) {
+  const items = _commandPalette.querySelectorAll('.command-item');
+  if (!items.length) return;
+  items.forEach(i => i.classList.remove('selected'));
+  _commandSelectionIdx = Math.max(0, Math.min(_commandSelectionIdx + dir, items.length - 1));
+  items[_commandSelectionIdx]?.classList.add('selected');
+  items[_commandSelectionIdx]?.scrollIntoView({ block: 'nearest' });
+}
+function executeCommandSelection() {
+  const items = _commandPalette.querySelectorAll('.command-item');
+  const selected = items[_commandSelectionIdx];
+  if (!selected) return;
+  const idx = parseInt(selected.dataset.idx);
+  const q = _commandPalette.querySelector('.command-input').value.toLowerCase();
+  const filtered = _commandItems.filter(item => item.label.toLowerCase().includes(q));
+  executeCommand(filtered[idx]);
+}
+function executeCommand(item) {
+  closeCommandPalette();
+  if (item.tab) {
+    const btn = document.querySelector(`.nav-btn[data-tab="${item.tab}"]`);
+    if (btn) btn.click();
+    else activateTab(item.tab);
+  } else if (item.action) {
+    item.action();
+  }
+}
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    e.preventDefault();
+    if (_commandPalette?.classList.contains('open')) closeCommandPalette();
+    else openCommandPalette();
+  }
+  if (e.key === 'Escape') closeCommandPalette();
+});
+
+// --- 10. Settings search ---
+function initSettingsSearch() {
+  const settingsPanel = document.getElementById('tab-settings');
+  if (!settingsPanel) return;
+  const searchWrap = document.createElement('div');
+  searchWrap.className = 'settings-search';
+  searchWrap.innerHTML = `
+    <span class="settings-search-icon">🔍</span>
+    <input class="settings-search-input" placeholder="Search settings..." />
+  `;
+  settingsPanel.prepend(searchWrap);
+  const input = searchWrap.querySelector('input');
+  input.addEventListener('input', () => {
+    const q = input.value.toLowerCase();
+    const groups = settingsPanel.querySelectorAll('.card');
+    let hasResults = false;
+    groups.forEach(card => {
+      const text = card.textContent.toLowerCase();
+      const matches = text.includes(q);
+      card.style.display = matches || !q ? '' : 'none';
+      if (matches) hasResults = true;
+    });
+    let noResults = settingsPanel.querySelector('.settings-no-results');
+    if (!hasResults && q) {
+      if (!noResults) {
+        noResults = document.createElement('div');
+        noResults.className = 'settings-no-results';
+        settingsPanel.appendChild(noResults);
+      }
+      noResults.textContent = `No settings match "${q}"`;
+    } else if (noResults) {
+      noResults.remove();
+    }
+  });
+}
+
+// --- 11. Undo snackbar ---
+function showSnackbar(message, actionLabel, onAction, duration = 5000) {
+  const existing = document.querySelector('.snackbar');
+  if (existing) existing.remove();
+  const snack = document.createElement('div');
+  snack.className = 'snackbar';
+  snack.innerHTML = `
+    <span>${message}</span>
+    <button class="snackbar-action">${actionLabel}</button>
+  `;
+  document.body.appendChild(snack);
+  snack.querySelector('.snackbar-action')?.addEventListener('click', () => {
+    if (onAction) onAction();
+    snack.classList.add('exiting');
+    setTimeout(() => snack.remove(), 200);
+  });
+  if (duration > 0) {
+    setTimeout(() => {
+      if (snack.isConnected) {
+        snack.classList.add('exiting');
+        setTimeout(() => snack.remove(), 200);
+      }
+    }, duration);
+  }
+  return snack;
+}
+
+// --- 12. Ripple effect on buttons ---
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.btn.primary, .btn.danger');
+  if (!btn || btn.disabled) return;
+  const rect = btn.getBoundingClientRect();
+  const ripple = document.createElement('span');
+  const size = Math.max(rect.width, rect.height);
+  ripple.style.cssText = `
+    position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none;
+    background: rgba(255,255,255,0.15); width: ${size}px; height: ${size}px;
+    left: ${e.clientX - rect.left - size/2}px; top: ${e.clientY - rect.top - size/2}px;
+    transform: scale(0); animation: rippleEffect 500ms ease-out forwards;
+  `;
+  btn.style.position = 'relative';
+  btn.style.overflow = 'hidden';
+  btn.appendChild(ripple);
+  setTimeout(() => ripple.remove(), 500);
+});
+// Add ripple keyframes if not in CSS
+if (!document.getElementById('ripple-style')) {
+  const style = document.createElement('style');
+  style.id = 'ripple-style';
+  style.textContent = `@keyframes rippleEffect { to { transform: scale(3); opacity: 0; } }`;
+  document.head.appendChild(style);
+}
+
+// --- 13. Keyboard shortcut hints ---
+function addShortcutHint(el, shortcut) {
+  if (!el) return;
+  const hint = document.createElement('span');
+  hint.className = 'shortcut-hint';
+  hint.textContent = shortcut;
+  el.appendChild(hint);
+}
+
+// --- 14. Staggered entrance for overlay cards ---
+function applyStaggeredEntrance(container) {
+  if (!container) return;
+  container.classList.add('stagger-enter');
+  setTimeout(() => container.classList.remove('stagger-enter'), 500);
+}
+
+// --- 15. Context-aware tab accents ---
+function setTabAccent(tab) {
+  document.body.dataset.tab = tab || '';
+}
+
+// --- 16. Hover preview tooltips ---
+function showHoverPreview(el, content) {
+  let preview = document.getElementById('hover-preview');
+  if (!preview) {
+    preview = document.createElement('div');
+    preview.id = 'hover-preview';
+    preview.className = 'hover-preview';
+    document.body.appendChild(preview);
+  }
+  preview.innerHTML = content;
+  preview.classList.add('visible');
+  const rect = el.getBoundingClientRect();
+  preview.style.left = Math.min(rect.left, window.innerWidth - preview.offsetWidth - 8) + 'px';
+  preview.style.top = (rect.bottom + 8) + 'px';
+}
+function hideHoverPreview() {
+  const preview = document.getElementById('hover-preview');
+  if (preview) preview.classList.remove('visible');
+}
+
+// --- 17. Init all polish features ---
+function initPolishFeatures() {
+  initSidebarToggle();
+  initSettingsSearch();
+  startParticles(15);
+  initScrollAnimations();
+  observeScrollAnimations();
+  // Override activateTab to set tab accent
+  const _origActivate = activateTab;
+  activateTab = function(tab, btn) {
+    _origActivate.call(this, tab, btn);
+    setTabAccent(tab);
+  };
+  setTabAccent(state.activeTab);
+  // Add keyboard shortcut hints on nav buttons
+  document.querySelectorAll('[data-tab]').forEach(btn => {
+    const tab = btn.dataset.tab;
+    if (['dashboard','onevone','maps','settings'].includes(tab)) {
+      // Could add shortcut hints here if desired
+    }
+  });
+}
+
+// Init polish after original DOMContentLoaded runs
+document.addEventListener('DOMContentLoaded', () => {
+  // Let original init finish (renderAllTabs, initSidebarGroups, etc.)
+  setTimeout(initPolishFeatures, 150);
+}, { once: true });
