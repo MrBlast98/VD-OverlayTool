@@ -877,6 +877,9 @@ const HOTKEY_DEFAULTS = {
   winstreakNextKiller: null,
   winstreakAlwaysOnTop: null,
   overlayClose: 'Shift+F6',
+  bamboozleStart: 'F5',
+  bamboozlePause: 'F6',
+  bamboozleReset: 'F7',
 };
 
 let mainWindow = null;
@@ -890,6 +893,7 @@ const overlayWindows = {
   winstreak: null,
   ladder: null,
   queue: null,
+  bamboozle: null,
 };
 
 // Initialize overlay state, loading lock/enabled from store
@@ -900,6 +904,7 @@ const overlayState = {
   winstreak: { enabled: true, locked: store.get('overlay.winstreak.locked', false) },
   ladder: { enabled: true, locked: store.get('overlay.ladder.locked', false) },
   queue: { enabled: true, locked: store.get('overlay.queue.locked', false) },
+  bamboozle: { enabled: true, locked: store.get('overlay.bamboozle.locked', false) },
 };
 
 const OVERLAY_LAYOUT = {
@@ -909,6 +914,7 @@ const OVERLAY_LAYOUT = {
   winstreak: { width: 560, height: 240, xOffset: 0, y: 40 },
   ladder: { width: 700, height: 240, xOffset: 0, y: 40 },
   queue: { width: 520, height: 300, xOffset: 0, y: 40 },
+  bamboozle: { width: 220, height: 200, xOffset: 0, y: 40 },
 };
 
 function getOverlayWindow(type) {
@@ -1105,6 +1111,9 @@ function dispatchHotkey(name) {
     mapsToggleRegion: ['maps', 'toggle-region'],
     winstreakNextKiller: ['winstreak', 'next-killer'],
     winstreakAlwaysOnTop: ['winstreak', 'always-on-top-toggle'],
+    bamboozleStart: ['bamboozle', 'timer-start'],
+    bamboozlePause: ['bamboozle', 'timer-pause'],
+    bamboozleReset: ['bamboozle', 'timer-reset'],
   };
 
   if (name === 'overlayClose') {
@@ -1192,6 +1201,7 @@ function createMainWindow() {
       nodeIntegration: true,
       contextIsolation: false,
       devTools: false,
+      backgroundThrottling: false,
       preload: path.join(__dirname, 'preload.js'),
     },
     icon: path.join(__dirname, '../../assets/icon.png'),
@@ -1253,6 +1263,7 @@ function createOverlayWindow(type) {
       nodeIntegration: true,
       contextIsolation: false,
       devTools: false,
+      backgroundThrottling: false,
       additionalArguments: [`--overlay-type=${type}`],
     },
   });
@@ -1264,7 +1275,7 @@ function createOverlayWindow(type) {
   overlayWindow.on('move', () => syncWindowDpiScale(overlayWindow));
   overlayWindow.on('resize', () => syncWindowDpiScale(overlayWindow));
   const locked = overlayState[type]?.locked || false;
-  overlayWindow.setIgnoreMouseEvents(Boolean(locked && clickthrough), { forward: true });
+  overlayWindow.setIgnoreMouseEvents(Boolean(clickthrough), { forward: true });
   
   // Apply lock state from overlayState
   overlayWindow.setMovable(!locked);
@@ -1309,7 +1320,8 @@ function setOverlayLocked(type, locked) {
   if (overlayWindow) {
     overlayWindow.setMovable(!locked);
     overlayWindow.setResizable(!locked);
-    overlayWindow.setIgnoreMouseEvents(Boolean(locked), { forward: true });
+    const ct = store.get(`overlay.${type}.clickthrough`, true);
+    overlayWindow.setIgnoreMouseEvents(Boolean(ct), { forward: true });
     // notify overlay window about the new locked state so UI can update
     overlayWindow.webContents.send('overlay-data', { type, state: getOverlayState(type) });
   }
@@ -1352,6 +1364,20 @@ ipcMain.on('update-overlay', (event, type, data) => {
     } else {
       overlayWindow.webContents.send('overlay-data', { type, data });
     }
+  }
+});
+
+ipcMain.on('onevone-command', (event, cmd) => {
+  const overlayWindow = getOverlayWindow('onevone');
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('onevone-command', cmd);
+  }
+});
+
+ipcMain.on('bamboozle-command', (event, cmd) => {
+  const overlayWindow = getOverlayWindow('bamboozle');
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('bamboozle-command', cmd);
   }
 });
 
@@ -1414,6 +1440,7 @@ ipcMain.on('resize-overlay-window', (event, width, height) => {
     winstreak: { width: 420, height: 180 },
     ladder: { width: 480, height: 200 },
     queue: { width: 420, height: 220 },
+    bamboozle: { width: 180, height: 160 },
   };
   const fallbackMin = { width: 320, height: 180 };
   const minSize = (type && minSizes[type]) || fallbackMin;
@@ -1446,7 +1473,7 @@ ipcMain.on('toggle-overlay-always-on-top', (event, type, alwaysOnTop) => {
   const overlayWindow = getOverlayWindow(type);
   if (overlayWindow) {
     overlayWindow.setAlwaysOnTop(alwaysOnTop);
-    overlayWindow.setIgnoreMouseEvents(Boolean(store.get(`overlay.${type}.clickthrough`, false)), { forward: true });
+    overlayWindow.setIgnoreMouseEvents(Boolean(store.get(`overlay.${type}.clickthrough`, true)), { forward: true });
   }
 });
 
@@ -1462,11 +1489,12 @@ ipcMain.on('update-overlay-opacity', (event, type, opacity) => {
 ipcMain.on('toggle-overlay-transparent', (event, type, transparent) => {
   const overlayWindow = getOverlayWindow(type);
   if (overlayWindow) {
-    // Toggle only the overlay background alpha so content remains visible.
     const alpha = transparent ? '0' : '0.8';
     overlayWindow.webContents.executeJavaScript(`
       document.documentElement.style.setProperty('--overlay-bg-alpha', '${alpha}');
-      // ensure the window itself remains rendered
+      if (document.querySelector('.ov-bamboozle')) {
+        document.querySelector('.ov-bamboozle').style.setProperty('--bam-bg', '${transparent ? 'transparent' : 'rgba(0,0,0,0.55)'}');
+      }
       document.documentElement.style.opacity = document.documentElement.style.opacity || '1';
       if (typeof updateTransparencyClass === 'function') updateTransparencyClass();
     `);
@@ -1487,8 +1515,7 @@ ipcMain.on('update-overlay-background-alpha', (event, type, alpha) => {
 ipcMain.on('toggle-overlay-clickthrough', (event, type, clickthrough) => {
   const overlayWindow = getOverlayWindow(type);
   if (overlayWindow) {
-    const locked = overlayState[type]?.locked || false;
-    overlayWindow.setIgnoreMouseEvents(Boolean(locked && clickthrough), { forward: true });
+    overlayWindow.setIgnoreMouseEvents(Boolean(clickthrough), { forward: true });
   }
 });
 
@@ -1801,6 +1828,52 @@ ipcMain.on('overlay-screenshot', async (event) => {
   } catch (err) {
     console.error('Failed to capture overlay screenshot', err);
     event.sender.send('overlay-screenshot-failed', String(err));
+  }
+});
+
+// Overlay customization IPC
+ipcMain.on('overlay-set-border-color', (event, type, color) => {
+  const bw = getOverlayWindow(type);
+  if (bw && bw.webContents) {
+    bw.webContents.send('overlay-data', { borderColor: color });
+  }
+});
+
+ipcMain.on('overlay-set-border-radius', (event, type, radius) => {
+  const bw = getOverlayWindow(type);
+  if (bw && bw.webContents) {
+    bw.webContents.send('overlay-data', { borderRadius: Number(radius) || 14 });
+  }
+});
+
+ipcMain.on('overlay-set-watermark', (event, type, show, text) => {
+  const bw = getOverlayWindow(type);
+  if (bw && bw.webContents) {
+    bw.webContents.send('overlay-data', { showWatermark: !!show, watermarkText: text || '' });
+  }
+});
+
+ipcMain.on('overlay-set-team-colors', (event, type, team1Color, team2Color) => {
+  const bw = getOverlayWindow(type);
+  if (bw && bw.webContents) {
+    bw.webContents.send('overlay-data', { team1Color, team2Color });
+  }
+});
+
+ipcMain.on('overlay-set-gpu-mode', (event, type, useHardware) => {
+  const bw = getOverlayWindow(type);
+  if (bw) {
+    bw.webContents.setFrameRate(useHardware ? 60 : 30);
+    if (!useHardware) {
+      bw.webContents.disableFrameAutoThrottle();
+    }
+  }
+});
+
+ipcMain.on('overlay-notification-sound-toggle', (event, type, enabled) => {
+  const bw = getOverlayWindow(type);
+  if (bw) {
+    store.set(`overlay-sound-${type}`, enabled);
   }
 });
 

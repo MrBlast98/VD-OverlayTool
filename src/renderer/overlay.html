@@ -44,6 +44,13 @@
       --gold-2: #ffb84d;
       --silver-1: #d7e3ff;
       --silver-2: #aab8ff;
+
+      /* Overlay customization overrides (set via IPC) */
+      --overlay-border-color: transparent;
+      --overlay-border-width: 0px;
+      --overlay-radius: 14px;
+      --team-1-color: #76c5b6;
+      --team-2-color: #ff8da1;
     }
 
     * {
@@ -81,9 +88,25 @@
       display: flex;
       align-items: stretch;
       justify-content: stretch;
+      border-radius: var(--overlay-radius);
       padding: 0;
       position: relative;
     }
+
+    .overlay-watermark {
+      position: absolute;
+      bottom: 6px;
+      right: 10px;
+      font-size: 8px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.15);
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0;
+      transition: opacity 400ms ease;
+    }
+    .overlay-watermark.show { opacity: 0.5; }
 
     /* Window resize handles */
     .resize-handle {
@@ -139,6 +162,7 @@
     }
 
     .overlay-full-transparent .onevone-container,
+    .overlay-full-transparent .bam-container,
     .overlay-full-transparent .maps-stage,
     .overlay-full-transparent .scrim-art,
     .overlay-full-transparent .fourvone-glass-inner,
@@ -419,7 +443,8 @@
     .ov-maps,
     .ov-fourvone,
     .ov-winstreak,
-    .ov-queue {
+    .ov-queue,
+    .ov-bamboozle {
       position: relative;
       width: 100%;
       height: 100%;
@@ -441,6 +466,130 @@
     .ov-queue {
       align-items: stretch;
       justify-content: center;
+    }
+
+    .ov-bamboozle {
+      align-items: center;
+      justify-content: center;
+      --bam-accent: #e0543e;
+      --bam-text: #ffffff;
+      --bam-warn: #ffb37e;
+    }
+
+    .bam-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 16px;
+      min-width: 160px;
+      animation: bamFadeIn 0.35s ease-out;
+    }
+
+    .bam-ring-wrap {
+      position: relative;
+      width: 160px;
+      height: 160px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .bam-ring-svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 160px;
+      height: 160px;
+      filter: drop-shadow(0 0 6px rgba(224,84,62,0.25));
+    }
+
+    .bam-ring-fill {
+      transition: stroke-dashoffset 100ms linear;
+    }
+
+    .bam-ring-icon {
+      width: 130px;
+      height: 130px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1;
+      overflow: hidden;
+      animation: bamIconPulse 2s ease-in-out infinite;
+    }
+
+    .bam-ring-icon .bam-perk-icon {
+      width: 130px;
+      height: 130px;
+      object-fit: contain;
+    }
+
+    .bam-timer {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--bam-text);
+      text-shadow: 0 2px 12px rgba(0,0,0,0.7);
+      text-align: center;
+      line-height: 1.3;
+      animation: bamFadeIn 0.3s ease-out;
+    }
+
+    .bam-count {
+      font-size: 38px;
+      font-weight: 800;
+      display: inline-block;
+    }
+
+    .bam-count.bam-warning {
+      color: var(--bam-warn);
+      animation: bamWarnPulse 0.5s ease-in-out infinite alternate;
+    }
+
+    .bam-unit {
+      font-size: 18px;
+      font-weight: 500;
+      opacity: 0.6;
+      margin-left: 1px;
+    }
+
+    .bam-timer.bam-ready {
+      font-size: 32px;
+      font-weight: 900;
+      color: var(--bam-accent);
+      text-shadow: 0 0 20px rgba(224,84,62,0.5), 0 2px 12px rgba(0,0,0,0.7);
+      animation: bamReadyPulse 0.8s ease-in-out infinite alternate;
+      letter-spacing: 3px;
+    }
+
+    .bam-timer.bam-idle {
+      font-size: 16px;
+      opacity: 0.5;
+    }
+
+    .ov-bamboozle.bam-complete .bam-ring-fill {
+      transition: stroke-dashoffset 400ms ease-out;
+    }
+
+    @keyframes bamFadeIn {
+      0% { opacity: 0; transform: scale(0.92); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes bamIconPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+    }
+
+    @keyframes bamReadyPulse {
+      0% { transform: scale(1); opacity: 0.85; text-shadow: 0 0 12px rgba(224,84,62,0.3), 0 2px 12px rgba(0,0,0,0.7); }
+      100% { transform: scale(1.06); opacity: 1; text-shadow: 0 0 28px rgba(224,84,62,0.6), 0 2px 12px rgba(0,0,0,0.7); }
+    }
+
+    @keyframes bamWarnPulse {
+      0% { transform: scale(1); opacity: 0.9; }
+      100% { transform: scale(1.07); opacity: 1; }
     }
 
     .queue-wrap {
@@ -815,6 +964,7 @@
     }
 
     .ov-onevone .onevone-side-timer {
+      font-variant-numeric: tabular-nums;
       min-width: 100%;
       padding: 20px 18px;
       background: linear-gradient(180deg, rgba(0,0,0,0.78), rgba(0,0,0,0.54));
@@ -826,6 +976,14 @@
       text-shadow: 0 4px 24px rgba(0,0,0,0.28) !important;
       text-align: center;
       transition: color 420ms ease, border-color 420ms ease, box-shadow 420ms ease, text-shadow 420ms ease, opacity 420ms ease, transform 420ms ease;
+    }
+
+    .timer-char {
+      display: inline;
+      font-variant-numeric: tabular-nums;
+    }
+    .timer-sep {
+      opacity: 0.6;
     }
 
     .ov-onevone .onevone-side-timer.running {
@@ -3592,6 +3750,7 @@
     <div class="resize-handle corner-nw"></div>
     <div class="resize-handle corner-se"></div>
     <div class="resize-handle corner-sw"></div>
+    <div class="overlay-watermark">VD-OverlayTool</div>
   </div>
 
   <script>
@@ -3610,7 +3769,7 @@
     let dpiScaleFactor = 1;
 
     function applyOverlayUiScale() {
-      const effectiveScale = Number(userUiScale || 1) * Number(dpiScaleFactor || 1);
+      const effectiveScale = Number(userUiScale || 1);
       document.documentElement.style.setProperty('--ui-scale', String(effectiveScale));
     }
 
@@ -3633,21 +3792,234 @@
     ipcRenderer.on('overlay-data', (event, payload) => {
       try {
         if (payload && payload.type && payload.type !== state.type) return;
-        // Keep overlay state separate from render payload so state-only updates
-        // do not wipe the data the renderer needs.
         if (payload && Object.prototype.hasOwnProperty.call(payload, 'state')) {
           state.overlayState = payload.state;
         }
         if (payload && Object.prototype.hasOwnProperty.call(payload, 'data')) {
           state.data = payload.data;
-        } else if (payload && (Object.prototype.hasOwnProperty.call(payload, 'ladder') || Object.prototype.hasOwnProperty.call(payload, 'winstreak') || Object.prototype.hasOwnProperty.call(payload, 'fourvone') || Object.prototype.hasOwnProperty.call(payload, 'maps') || Object.prototype.hasOwnProperty.call(payload, 'queue'))) {
+        } else if (payload && (Object.prototype.hasOwnProperty.call(payload, 'ladder') || Object.prototype.hasOwnProperty.call(payload, 'winstreak') || Object.prototype.hasOwnProperty.call(payload, 'fourvone') || Object.prototype.hasOwnProperty.call(payload, 'maps') || Object.prototype.hasOwnProperty.call(payload, 'queue') || Object.prototype.hasOwnProperty.call(payload, 'bamboozle'))) {
           state.data = payload;
         }
-        render();
+        applyOverlayCustomizations(payload);
+        if (state.type === 'onevone') {
+          if (!onevoneLocal.inited) {
+            onevoneLocal.inited = true;
+            render();
+            initOnevoneLocalState(state.data);
+            updateOnevoneDom();
+            if (onevoneLocal.timerRunning) startOnevoneLoop();
+          } else {
+            initOnevoneLocalState(state.data);
+            updateOnevoneDom();
+            if (onevoneLocal.timerRunning) startOnevoneLoop();
+          }
+        } else if (state.type === 'bamboozle') {
+          if (!bamLocal.inited) {
+            bamLocal.inited = true;
+            render();
+            initBamFromData(state.data);
+            updateBamDom();
+          } else {
+            initBamFromData(state.data);
+            updateBamDom();
+          }
+        } else {
+          render();
+        }
       } catch (err) {
         console.error('overlay-data handler failed', err);
       }
     });
+
+    ipcRenderer.on('onevone-command', (event, cmd) => {
+      if (state.type !== 'onevone') return;
+      if (!onevoneLocal.inited) return;
+      handleOnevoneCommand(cmd);
+      updateOnevoneDom();
+    });
+
+    // ── Bamboozle local timer management ──
+    const bamLocal = { running: false, remaining: 0, duration: 16, image: '', inited: false, rafId: null, lastUpdate: 0 };
+
+    function initBamFromData(data) {
+      const d = data && data.bamboozle ? data.bamboozle : data || {};
+      if (d.duration !== undefined) bamLocal.duration = d.duration;
+      if (d.image !== undefined) bamLocal.image = d.image;
+      if (d.remaining !== undefined) bamLocal.remaining = d.remaining;
+      if (d.running !== undefined) {
+        bamLocal.running = !!d.running;
+        if (bamLocal.running) { bamLocal.lastUpdate = performance.now(); startBamRaf(); }
+        else { stopBamRaf(); }
+      }
+    }
+
+    function startBamRaf() {
+      if (bamLocal.rafId) return;
+      bamLocal.lastUpdate = performance.now();
+      function tick() {
+        const now = performance.now();
+        const dt = (now - bamLocal.lastUpdate) / 1000;
+        bamLocal.lastUpdate = now;
+        bamLocal.remaining = Math.max(0, bamLocal.remaining - dt);
+        updateBamDom();
+        if (bamLocal.remaining <= 0) {
+          bamLocal.running = false;
+          stopBamRaf();
+          updateBamDom();
+        } else {
+          bamLocal.rafId = requestAnimationFrame(tick);
+        }
+      }
+      bamLocal.rafId = requestAnimationFrame(tick);
+    }
+
+    function stopBamRaf() {
+      if (bamLocal.rafId) { cancelAnimationFrame(bamLocal.rafId); bamLocal.rafId = null; }
+    }
+
+    function updateBamDom() {
+      const root = document.getElementById('overlay-root');
+      if (!root) return;
+      const section = root.querySelector('.ov-bamboozle');
+      if (!section) return;
+      const ready = !bamLocal.running && bamLocal.remaining <= 0;
+      const progress = bamLocal.duration > 0 ? Math.min(1, Math.max(0, bamLocal.remaining / bamLocal.duration)) : 0;
+      const circumference = 400;
+      const dashoffset = circumference * (1 - progress);
+      const ring = section.querySelector('.bam-ring-fill');
+      if (ring) ring.setAttribute('stroke-dashoffset', dashoffset);
+      const timerDiv = section.querySelector('.bam-timer');
+      if (timerDiv) {
+        if (ready) {
+          timerDiv.className = 'bam-timer bam-ready';
+          timerDiv.textContent = 'READY';
+        } else if (bamLocal.running) {
+          timerDiv.className = 'bam-timer';
+          const warn = bamLocal.remaining <= 3;
+          timerDiv.innerHTML = '<span class="bam-count' + (warn ? ' bam-warning' : '') + '">' + bamLocal.remaining.toFixed(1) + '<span class="bam-unit">s</span></span>';
+        } else {
+          timerDiv.className = 'bam-timer bam-idle';
+          timerDiv.textContent = 'PAUSED';
+        }
+      }
+      const iconDiv = section.querySelector('.bam-ring-icon');
+      if (iconDiv) {
+        const img = iconDiv.querySelector('.bam-perk-icon');
+        if (bamLocal.image) {
+          if (!img) iconDiv.innerHTML = '<img class="bam-perk-icon" src="' + bamLocal.image + '" alt="">';
+          else if (img.src !== bamLocal.image) img.src = bamLocal.image;
+        } else {
+          if (img) img.remove();
+        }
+      }
+      section.classList.toggle('bam-complete', ready);
+    }
+
+    ipcRenderer.on('bamboozle-command', (event, cmd) => {
+      if (state.type !== 'bamboozle') return;
+      if (!bamLocal.inited) {
+        bamLocal.inited = true;
+        if (cmd.duration !== undefined) bamLocal.duration = cmd.duration;
+        if (cmd.image !== undefined) bamLocal.image = cmd.image;
+        bamLocal.remaining = cmd.remaining || 0;
+        render();
+      }
+      switch (cmd.action) {
+        case 'start':
+          if (cmd.duration !== undefined) bamLocal.duration = cmd.duration;
+          if (cmd.image !== undefined) bamLocal.image = cmd.image;
+          if (cmd.remaining !== undefined) bamLocal.remaining = cmd.remaining;
+          bamLocal.running = true;
+          bamLocal.lastUpdate = performance.now();
+          startBamRaf();
+          break;
+        case 'pause':
+          bamLocal.running = false;
+          stopBamRaf();
+          if (cmd.remaining !== undefined) bamLocal.remaining = cmd.remaining;
+          break;
+        case 'reset':
+          bamLocal.running = false;
+          stopBamRaf();
+          bamLocal.remaining = 0;
+          break;
+        case 'complete':
+          bamLocal.running = false;
+          stopBamRaf();
+          bamLocal.remaining = 0;
+          break;
+      }
+      updateBamDom();
+    });
+
+    function applyOverlayCustomizations(payload) {
+      if (!payload) return;
+      const overlay = document.getElementById('overlay-root');
+      if (!overlay) return;
+
+      // Watermark
+      const wm = overlay.querySelector('.overlay-watermark');
+      if (wm && Object.prototype.hasOwnProperty.call(payload, 'showWatermark')) {
+        wm.classList.toggle('show', !!payload.showWatermark);
+      }
+
+      // Banner/text watermark content
+      if (wm && Object.prototype.hasOwnProperty.call(payload, 'watermarkText')) {
+        wm.textContent = payload.watermarkText || '';
+      }
+
+      // Overlay border customization
+      if (Object.prototype.hasOwnProperty.call(payload, 'borderColor')) {
+        document.documentElement.style.setProperty('--overlay-border-color', payload.borderColor);
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, 'borderWidth')) {
+        document.documentElement.style.setProperty('--overlay-border-width', payload.borderWidth + 'px');
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, 'borderRadius')) {
+        document.documentElement.style.setProperty('--overlay-radius', payload.borderRadius + 'px');
+      }
+
+      // Team colors for scrim
+      if (Object.prototype.hasOwnProperty.call(payload, 'team1Color')) {
+        document.documentElement.style.setProperty('--team-1-color', payload.team1Color);
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, 'team2Color')) {
+        document.documentElement.style.setProperty('--team-2-color', payload.team2Color);
+      }
+
+      // Portrait glow
+      const portraits = overlay.querySelectorAll('.killer-portrait');
+      if (portraits.length && Object.prototype.hasOwnProperty.call(payload, 'streakLevel')) {
+        portraits.forEach(p => {
+          p.classList.remove('streak-low', 'streak-med', 'streak-high');
+          if (payload.streakLevel === 'low') p.classList.add('streak-low');
+          else if (payload.streakLevel === 'med') p.classList.add('streak-med');
+          else if (payload.streakLevel === 'high') p.classList.add('streak-high');
+        });
+      }
+    }
+
+    function applyTimerRing(element, timerSeconds, totalSeconds) {
+      if (!element) return;
+      let wrap = element.querySelector('.timer-ring-wrap');
+      if (!wrap) {
+        wrap = document.createElement('span');
+        wrap.className = 'timer-ring-wrap';
+        wrap.innerHTML = `<svg class="timer-ring-svg" viewBox="0 0 40 40">
+          <circle class="timer-ring-bg" cx="20" cy="20" r="17"/>
+          <circle class="timer-ring-fg" cx="20" cy="20" r="17" stroke-dasharray="106.8" stroke-dashoffset="0"/>
+        </svg>`;
+        element.insertBefore(wrap, element.firstChild);
+      }
+      const fg = wrap.querySelector('.timer-ring-fg');
+      if (fg) {
+        const circumference = 2 * Math.PI * 17;
+        const total = Number(totalSeconds) || 120;
+        const remaining = Math.max(0, Math.min(Number(timerSeconds) || 0, total));
+        const offset = circumference * (1 - remaining / total);
+        fg.style.strokeDashoffset = String(offset);
+      }
+    }
 
     function toFileUrl(value) {
       if (!value) return '';
@@ -3679,18 +4051,28 @@
       const seed = String(seedValue || seedText || '0');
       const hue = hashString(seed) % 360;
       const hue2 = (hue + 42) % 360;
+      const hue3 = (hue + 84) % 360;
       const initial = escapeHtml(String(seedText || '?').trim().charAt(0).toUpperCase() || '?');
       const svg = `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Avatar: ${initial}">
           <defs>
             <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stop-color="hsl(${hue} 70% 45%)"/>
-              <stop offset="100%" stop-color="hsl(${hue2} 65% 28%)"/>
+              <stop offset="0%" stop-color="hsl(${hue} 72% 48%)"/>
+              <stop offset="50%" stop-color="hsl(${hue2} 68% 35%)"/>
+              <stop offset="100%" stop-color="hsl(${hue3} 60% 22%)"/>
             </linearGradient>
+            <linearGradient id="h" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="rgba(255,255,255,0.12)"/>
+              <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+            </linearGradient>
+            <filter id="s">
+              <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.3)"/>
+            </filter>
           </defs>
           <rect width="96" height="96" rx="48" fill="url(#g)"/>
-          <circle cx="48" cy="48" r="31" fill="rgba(255,255,255,0.08)"/>
-          <text x="48" y="58" text-anchor="middle" font-family="Arial, sans-serif" font-size="32" font-weight="700" fill="#fff">${initial}</text>
+          <circle cx="48" cy="48" r="32" fill="url(#h)"/>
+          <circle cx="48" cy="48" r="30" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+          <text x="48" y="58" text-anchor="middle" font-family="'Inter','Segoe UI',Arial,sans-serif" font-size="34" font-weight="700" fill="#fff" filter="url(#s)">${initial}</text>
         </svg>
       `;
       return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
@@ -3722,6 +4104,193 @@
       }
 
       return `${secs}.${cs2}`;
+    }
+
+    // ===== Onevone local timer =====
+    class OverlayPreciseTimer {
+      constructor() { this._running = false; this._startedAt = 0; this._accum = 0; }
+      start() { if (this._running) return; this._startedAt = performance.now(); this._running = true; }
+      pause() { if (!this._running) return; this._accum += performance.now() - this._startedAt; this._running = false; }
+      reset() { this._running = false; this._accum = 0; this._startedAt = 0; }
+      setElapsedMs(ms) { this._accum = Math.max(0, Number(ms) || 0); this._startedAt = this._running ? performance.now() : 0; }
+      get running() { return this._running; }
+      get elapsedMs() { return this._running ? this._accum + (performance.now() - this._startedAt) : this._accum; }
+    }
+
+    const onevoneLocal = {
+      timers: { 1: new OverlayPreciseTimer(), 2: new OverlayPreciseTimer() },
+      activeTimer: 1,
+      timerRunning: false,
+      player1Name: 'Player 1',
+      player2Name: 'Player 2',
+      player1Score: 0,
+      player2Score: 0,
+      player1Finished: false,
+      player2Finished: false,
+      rafId: null,
+      inited: false,
+    };
+
+    function writeTimerChars(element, formatted) {
+      if (!element) return;
+      const chars = [...formatted];
+      let children = element.children;
+      // Ensure correct number of child spans
+      while (children.length < chars.length) {
+        const span = document.createElement('span');
+        span.className = 'timer-char';
+        element.appendChild(span);
+      }
+      while (children.length > chars.length) {
+        element.removeChild(element.lastChild);
+      }
+      children = element.children;
+      for (let i = 0; i < chars.length; i++) {
+        const ch = chars[i];
+        const span = children[i];
+        span.textContent = ch === ' ' ? '\u00A0' : ch;
+        if (ch === ':' || ch === '.') {
+          span.className = 'timer-char timer-sep';
+        } else {
+          span.className = 'timer-char';
+        }
+      }
+    }
+
+    function initOnevoneLocalState(data) {
+      // data may be the IPC payload (with nested .data) or getData() output (with .onevone) or a plain onevone object
+      const raw = data || getData() || {};
+      const inner = raw.data && typeof raw.data === 'object' && !raw.data.onevone && !raw.player1Name ? raw.data : raw;
+      const o = inner && inner.onevone ? inner.onevone : inner;
+      onevoneLocal.player1Name = o.player1Name || 'Player 1';
+      onevoneLocal.player2Name = o.player2Name || 'Player 2';
+      onevoneLocal.player1Score = Number(o.player1Score || 0);
+      onevoneLocal.player2Score = Number(o.player2Score || 0);
+      onevoneLocal.player1Finished = !!o.player1Finished;
+      onevoneLocal.player2Finished = !!o.player2Finished;
+      onevoneLocal.activeTimer = Number(o.activeTimer || 1) === 2 ? 2 : 1;
+      onevoneLocal.timerRunning = !!o.timerRunning;
+      const p1elapsed = Number(o.player1ElapsedMs ?? o.player1Seconds * 1000) || 0;
+      const p2elapsed = Number(o.player2ElapsedMs ?? o.player2Seconds * 1000) || 0;
+      onevoneLocal.timers[1].setElapsedMs(p1elapsed);
+      onevoneLocal.timers[2].setElapsedMs(p2elapsed);
+      if (onevoneLocal.timerRunning) {
+        onevoneLocal.timers[onevoneLocal.activeTimer].start();
+      }
+    }
+
+    function updateOnevoneDom() {
+      const p1e = document.getElementById('ov-timer-1');
+      const p2e = document.getElementById('ov-timer-2');
+      if (p1e) {
+        const v = formatMillisDynamic(onevoneLocal.timers[1].elapsedMs);
+        writeTimerChars(p1e, v);
+        const side = p1e.closest('.onevone-side');
+        if (side) {
+          const isActive = onevoneLocal.activeTimer === 1 && onevoneLocal.timerRunning;
+          side.classList.toggle('running', isActive);
+        }
+      }
+      if (p2e) {
+        const v = formatMillisDynamic(onevoneLocal.timers[2].elapsedMs);
+        writeTimerChars(p2e, v);
+        const side = p2e.closest('.onevone-side');
+        if (side) {
+          const isActive = onevoneLocal.activeTimer === 2 && onevoneLocal.timerRunning;
+          side.classList.toggle('running', isActive);
+        }
+      }
+      const pill = document.getElementById('ov-score-pill');
+      if (pill) pill.textContent = `${onevoneLocal.player1Score} - ${onevoneLocal.player2Score}`;
+      const n1 = document.getElementById('ov-p1-name');
+      const n2 = document.getElementById('ov-p2-name');
+      if (n1) n1.textContent = onevoneLocal.player1Name;
+      if (n2) n2.textContent = onevoneLocal.player2Name;
+      const footer = document.getElementById('ov-footer-status');
+      if (footer) {
+        if (onevoneLocal.timerRunning) {
+          const label = onevoneLocal.activeTimer === 2 ? onevoneLocal.player2Name : onevoneLocal.player1Name;
+          footer.textContent = `Currently running: ${label}`;
+        } else {
+          footer.textContent = 'Paused';
+        }
+      }
+      const fplayers = document.getElementById('ov-footer-players');
+      if (fplayers) {
+        fplayers.textContent = `${onevoneLocal.player1Finished ? 'P1 done' : 'P1 live'} / ${onevoneLocal.player2Finished ? 'P2 done' : 'P2 live'}`;
+      }
+    }
+
+    function onevoneTick() {
+      if (!onevoneLocal.timerRunning) return;
+      updateOnevoneDom();
+      onevoneLocal.rafId = requestAnimationFrame(onevoneTick);
+    }
+
+    function startOnevoneLoop() {
+      if (onevoneLocal.rafId) cancelAnimationFrame(onevoneLocal.rafId);
+      onevoneLocal.rafId = requestAnimationFrame(onevoneTick);
+    }
+
+    function stopOnevoneLoop() {
+      if (onevoneLocal.rafId) {
+        cancelAnimationFrame(onevoneLocal.rafId);
+        onevoneLocal.rafId = null;
+      }
+    }
+
+    function handleOnevoneCommand(cmd) {
+      if (!cmd || typeof cmd !== 'object') return;
+      const { command, player } = cmd;
+      if (command === 'start') {
+        const p = player === 2 ? 2 : 1;
+        onevoneLocal.activeTimer = p;
+        onevoneLocal.timers[p].start();
+        onevoneLocal.timerRunning = true;
+        startOnevoneLoop();
+      } else if (command === 'pause') {
+        onevoneLocal.timers[1].pause();
+        onevoneLocal.timers[2].pause();
+        onevoneLocal.timerRunning = false;
+        stopOnevoneLoop();
+      } else if (command === 'reset') {
+        stopOnevoneLoop();
+        onevoneLocal.timers[1].reset();
+        onevoneLocal.timers[2].reset();
+        onevoneLocal.activeTimer = 1;
+        onevoneLocal.timerRunning = false;
+        onevoneLocal.player1Finished = false;
+        onevoneLocal.player2Finished = false;
+      } else if (command === 'switch') {
+        const next = onevoneLocal.activeTimer === 1 ? 2 : 1;
+        if (onevoneLocal.timerRunning) {
+          onevoneLocal.timers[onevoneLocal.activeTimer].pause();
+          onevoneLocal.timers[next].start();
+        }
+        onevoneLocal.activeTimer = next;
+      } else if (command === 'finish') {
+        const p = player === 2 ? 2 : 1;
+        if (p === 1) onevoneLocal.player1Finished = true;
+        if (p === 2) onevoneLocal.player2Finished = true;
+        if (onevoneLocal.timerRunning) {
+          const other = p === 1 ? 2 : 1;
+          if (!(p === 1 ? onevoneLocal.player2Finished : onevoneLocal.player1Finished)) {
+            onevoneLocal.timers[p].pause();
+            onevoneLocal.timers[other].start();
+            onevoneLocal.activeTimer = other;
+          }
+          if (onevoneLocal.player1Finished && onevoneLocal.player2Finished) {
+            onevoneLocal.timers[1].pause();
+            onevoneLocal.timers[2].pause();
+            onevoneLocal.timerRunning = false;
+            stopOnevoneLoop();
+          }
+        }
+      } else if (command === 'sync') {
+        initOnevoneLocalState(cmd);
+        updateOnevoneDom();
+        if (onevoneLocal.timerRunning) startOnevoneLoop();
+      }
     }
 
     function getData() {
@@ -3767,35 +4336,18 @@
 
     function renderOnevone() {
       const data = getData();
-      const onevone = data.onevone || {};
-      const player1Name = onevone.player1Name || 'Player 1';
-      const player2Name = onevone.player2Name || 'Player 2';
-      const player1Score = Number(onevone.player1Score || 0);
-      const player2Score = Number(onevone.player2Score || 0);
-      const player1Time = formatMillisDynamic(onevone.player1ElapsedMs ?? onevone.player1Seconds * 1000);
-      const player2Time = formatMillisDynamic(onevone.player2ElapsedMs ?? onevone.player2Seconds * 1000);
-      const activeTimer = Number(onevone.activeTimer || 1) === 2 ? 2 : 1;
-      const timerRunning = !!onevone.timerRunning;
+      const o = data && data.onevone ? data.onevone : (data || {});
+      const player1Name = o.player1Name || 'Player 1';
+      const player2Name = o.player2Name || 'Player 2';
+      const player1Score = Number(o.player1Score || 0);
+      const player2Score = Number(o.player2Score || 0);
+      const p1Time = formatMillisDynamic(Number(o.player1ElapsedMs ?? o.player1Seconds * 1000) || 0);
+      const p2Time = formatMillisDynamic(Number(o.player2ElapsedMs ?? o.player2Seconds * 1000) || 0);
+      const activeTimer = Number(o.activeTimer || 1) === 2 ? 2 : 1;
+      const timerRunning = !!o.timerRunning;
       const activeLabel = activeTimer === 2 ? player2Name : player1Name;
-      const p1Elapsed = Number(onevone.player1ElapsedMs ?? onevone.player1Seconds * 1000) || 0;
-      const p2Elapsed = Number(onevone.player2ElapsedMs ?? onevone.player2Seconds * 1000) || 0;
-      const activeElapsed = activeTimer === 2 ? p2Elapsed : p1Elapsed;
-      const otherElapsed = activeTimer === 2 ? p1Elapsed : p2Elapsed;
-      const warningWindowMs = 1500;
-      const delta = Math.abs(activeElapsed - otherElapsed);
-      const isCrossoverWarning = timerRunning && delta <= warningWindowMs;
-      const activeTimerClass = [
-        'onevone-side-timer',
-        activeTimer === 1 && timerRunning && !isCrossoverWarning ? 'running' : '',
-        activeTimer === 2 && timerRunning && !isCrossoverWarning ? 'running' : '',
-        isCrossoverWarning ? 'warning' : '',
-      ].filter(Boolean).join(' ');
-      const activeSideClass = (side) => {
-        const classes = ['onevone-side'];
-        if (timerRunning && activeTimer === side && !isCrossoverWarning) classes.push('running');
-        if (isCrossoverWarning && activeTimer === side) classes.push('warning');
-        return classes.join(' ');
-      };
+      const p1Finished = !!o.player1Finished;
+      const p2Finished = !!o.player2Finished;
 
       return `
         <section class="overlay-shell ov-onevone">
@@ -3803,21 +4355,21 @@
           <div class="onevone-container">
             <div class="onevone-board">
               <div class="onevone-head">
-                <div class="onevone-name">${escapeHtml(player1Name)}</div>
-                <div class="onevone-score-pill">${escapeHtml(String(player1Score))} - ${escapeHtml(String(player2Score))}</div>
-                <div class="onevone-name right">${escapeHtml(player2Name)}</div>
+                <div class="onevone-name" id="ov-p1-name">${escapeHtml(player1Name)}</div>
+                <div class="onevone-score-pill" id="ov-score-pill">${escapeHtml(String(player1Score))} - ${escapeHtml(String(player2Score))}</div>
+                <div class="onevone-name right" id="ov-p2-name">${escapeHtml(player2Name)}</div>
               </div>
               <div class="onevone-row">
-                <div class="${activeSideClass(1)}">
-                  <div class="${activeTimer === 1 ? activeTimerClass : 'onevone-side-timer'} ${isCrossoverWarning && activeTimer === 1 ? 'fade-out' : ''}">${escapeHtml(player1Time)}</div>
+                <div class="onevone-side" id="ov-side-1">
+                  <div class="onevone-side-timer" id="ov-timer-1"></div>
                 </div>
-                <div class="${activeSideClass(2)}">
-                  <div class="${activeTimer === 2 ? activeTimerClass : 'onevone-side-timer'} ${isCrossoverWarning && activeTimer === 2 ? 'fade-out' : ''}">${escapeHtml(player2Time)}</div>
+                <div class="onevone-side" id="ov-side-2">
+                  <div class="onevone-side-timer" id="ov-timer-2"></div>
                 </div>
               </div>
               <div class="onevone-footer">
-                <span>${escapeHtml(timerRunning ? `Currently running: ${activeLabel}` : 'Paused')}</span>
-                <span>${escapeHtml(onevone.player1Finished ? 'P1 done' : 'P1 live')} / ${escapeHtml(onevone.player2Finished ? 'P2 done' : 'P2 live')}</span>
+                <span id="ov-footer-status">${escapeHtml(timerRunning ? `Currently running: ${activeLabel}` : 'Paused')}</span>
+                <span id="ov-footer-players">${escapeHtml(p1Finished ? 'P1 done' : 'P1 live')} / ${escapeHtml(p2Finished ? 'P2 done' : 'P2 live')}</span>
               </div>
             </div>
           </div>
@@ -4018,8 +4570,8 @@
         : `<div class="winstreak-model fallback"><div class="winstreak-art-fallback">${escapeHtml(killerIcon)}</div></div>`;
 
       const killerBadges = `
-        ${pb ? `<div class="winstreak-badge pb"><span class="badge-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 2l3.1 5.9 6.4.9-4.6 4 1.1 6.4L12 17.8 6 19.1l1.1-6.4L2.6 8.7l6.4-.9L12 2z" fill="currentColor"/></svg></span><span class="badge-label">PB ${escapeHtml(pb)}</span><span class="badge-shine" aria-hidden="true"></span></div>` : ''}
-        ${worldRecord ? `<div class="winstreak-badge wr"><span class="badge-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="12" cy="10" r="5" fill="currentColor"/><path d="M8 3 L12 9 L16 3" fill="currentColor" opacity="0.18"/></svg></span><span class="badge-label">WR ${escapeHtml(worldRecord)}</span><span class="badge-shine" aria-hidden="true"></span></div>` : ''}
+        ${pb ? `<div class="winstreak-badge pb"><span class="badge-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="starG" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="%23d7e3ff"/><stop offset="100%" stop-color="%23aab8ff"/></linearGradient></defs><path d="M12 1.5l2.8 5.7 6.3.9-4.6 4.5 1.1 6.4L12 16.5l-5.6 3 1.1-6.4L2.9 8.1l6.3-.9L12 1.5z" fill="url(%23starG)" stroke="rgba(170,184,255,0.3)" stroke-width="0.5"/></svg></span><span class="badge-label">PB ${escapeHtml(pb)}</span><span class="badge-shine" aria-hidden="true"></span></div>` : ''}
+        ${worldRecord ? `<div class="winstreak-badge wr"><span class="badge-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="crownG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="%23ffd36b"/><stop offset="100%" stop-color="%23ffb84d"/></linearGradient></defs><path d="M4 19l2-10 4 4 2-8 2 8 4-4 2 10H4z" fill="url(%23crownG)" stroke="rgba(255,184,77,0.3)" stroke-width="0.5"/></svg></span><span class="badge-label">WR ${escapeHtml(worldRecord)}</span><span class="badge-shine" aria-hidden="true"></span></div>` : ''}
       `;
 
       const survivorMinimal = `
@@ -4033,7 +4585,7 @@
             <div class="winstreak-art winstreak-art-survivor">
               <div class="survivor-emblem" aria-hidden="true">
                 <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Survivor emblem">
-                  <path d="M32 10c-9.4 0-17 7.6-17 17 0 14 17 27 17 27s17-13 17-27c0-9.4-7.6-17-17-17zm0 24a7 7 0 1 1 0-14 7 7 0 0 1 0 14z" fill="currentColor" opacity="0.92"/>
+                  <defs><radialGradient id="sG" cx="0.5" cy="0.4" r="0.7"><stop offset="0%" stop-color="%237fc5b6" stop-opacity="0.95"/><stop offset="100%" stop-color="%235a9e8f" stop-opacity="0.85"/></radialGradient><filter id="sS"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="rgba(0,0,0,0.3)"/></filter></defs><path d="M32 6C20 6 10 16 10 28c0 18 22 30 22 30s22-12 22-30C54 16 44 6 32 6zm0 22a6 6 0 1 1 0-12 6 6 0 0 1 0 12z" fill="url(%23sG)" filter="url(%23sS)"/>
                   <circle cx="18" cy="18" r="4" fill="currentColor" opacity="0.55"/>
                   <circle cx="46" cy="18" r="4" fill="currentColor" opacity="0.55"/>
                   <circle cx="20" cy="48" r="3.5" fill="currentColor" opacity="0.45"/>
@@ -4050,7 +4602,7 @@
                     <div class="winstreak-wincon">${escapeHtml(survivorPb ? `PB ${survivorPb}` : 'PB -')}</div>
                   </div>
                   <div class="winstreak-badges">
-                    ${survivorWr ? `<div class="winstreak-badge wr"><span class="badge-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="12" cy="10" r="5" fill="currentColor"/><path d="M8 3 L12 9 L16 3" fill="currentColor" opacity="0.18"/></svg></span><span class="badge-label">WR ${escapeHtml(survivorWr)}</span><span class="badge-shine" aria-hidden="true"></span></div>` : ''}
+                    ${survivorWr ? `<div class="winstreak-badge wr"><span class="badge-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="crG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="%23ffd36b"/><stop offset="100%" stop-color="%23ffb84d"/></linearGradient></defs><path d="M4 19l2-10 4 4 2-8 2 8 4-4 2 10H4z" fill="url(%23crG)" stroke="rgba(255,184,77,0.3)" stroke-width="0.5"/></svg></span><span class="badge-label">WR ${escapeHtml(survivorWr)}</span><span class="badge-shine" aria-hidden="true"></span></div>` : ''}
                   </div>
                 </div>
               </div>
@@ -4070,7 +4622,7 @@
             <div class="winstreak-survivor-badge">
               <div class="survivor-emblem survivor-emblem-compact" aria-hidden="true">
                 <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Survivor emblem">
-                  <path d="M32 10c-9.4 0-17 7.6-17 17 0 14 17 27 17 27s17-13 17-27c0-9.4-7.6-17-17-17zm0 24a7 7 0 1 1 0-14 7 7 0 0 1 0 14z" fill="currentColor" opacity="0.92"/>
+                  <defs><radialGradient id="sG" cx="0.5" cy="0.4" r="0.7"><stop offset="0%" stop-color="%237fc5b6" stop-opacity="0.95"/><stop offset="100%" stop-color="%235a9e8f" stop-opacity="0.85"/></radialGradient><filter id="sS"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="rgba(0,0,0,0.3)"/></filter></defs><path d="M32 6C20 6 10 16 10 28c0 18 22 30 22 30s22-12 22-30C54 16 44 6 32 6zm0 22a6 6 0 1 1 0-12 6 6 0 0 1 0 12z" fill="url(%23sG)" filter="url(%23sS)"/>
                   <circle cx="18" cy="18" r="4" fill="currentColor" opacity="0.55"/>
                   <circle cx="46" cy="18" r="4" fill="currentColor" opacity="0.55"/>
                   <circle cx="20" cy="48" r="3.5" fill="currentColor" opacity="0.45"/>
@@ -4087,7 +4639,7 @@
               <div class="winstreak-survivor-meta">${escapeHtml(survivorPb ? `PB ${survivorPb}` : 'PB -')}</div>
             </div>
             <div class="winstreak-survivor-badge-right">
-              ${survivorWr ? `<div class="winstreak-badge wr"><span class="badge-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="12" cy="10" r="5" fill="currentColor"/><path d="M8 3 L12 9 L16 3" fill="currentColor" opacity="0.18"/></svg></span><span class="badge-label">WR ${escapeHtml(survivorWr)}</span><span class="badge-shine" aria-hidden="true"></span></div>` : ''}
+              ${survivorWr ? `<div class="winstreak-badge wr"><span class="badge-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="crG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="%23ffd36b"/><stop offset="100%" stop-color="%23ffb84d"/></linearGradient></defs><path d="M4 19l2-10 4 4 2-8 2 8 4-4 2 10H4z" fill="url(%23crG)" stroke="rgba(255,184,77,0.3)" stroke-width="0.5"/></svg></span><span class="badge-label">WR ${escapeHtml(survivorWr)}</span><span class="badge-shine" aria-hidden="true"></span></div>` : ''}
               ${survivorOutLabel ? `<div class="winstreak-survivor-out">${escapeHtml(survivorOutLabel)}</div>` : ''}
             </div>
           </div>
@@ -4124,7 +4676,7 @@
             <div class="winstreak-survivor-ring-icon">
               <div class="survivor-emblem survivor-emblem-ring" aria-hidden="true">
                 <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Survivor emblem">
-                  <path d="M32 10c-9.4 0-17 7.6-17 17 0 14 17 27 17 27s17-13 17-27c0-9.4-7.6-17-17-17zm0 24a7 7 0 1 1 0-14 7 7 0 0 1 0 14z" fill="currentColor" opacity="0.92"/>
+                  <defs><radialGradient id="sG" cx="0.5" cy="0.4" r="0.7"><stop offset="0%" stop-color="%237fc5b6" stop-opacity="0.95"/><stop offset="100%" stop-color="%235a9e8f" stop-opacity="0.85"/></radialGradient><filter id="sS"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="rgba(0,0,0,0.3)"/></filter></defs><path d="M32 6C20 6 10 16 10 28c0 18 22 30 22 30s22-12 22-30C54 16 44 6 32 6zm0 22a6 6 0 1 1 0-12 6 6 0 0 1 0 12z" fill="url(%23sG)" filter="url(%23sS)"/>
                   <circle cx="18" cy="18" r="4" fill="currentColor" opacity="0.55"/>
                   <circle cx="46" cy="18" r="4" fill="currentColor" opacity="0.55"/>
                   <circle cx="20" cy="48" r="3.5" fill="currentColor" opacity="0.45"/>
@@ -4183,7 +4735,7 @@
                 </svg>
                 <div class="survivor-emblem survivor-emblem-progress" aria-hidden="true">
                   <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M32 10c-9.4 0-17 7.6-17 17 0 14 17 27 17 27s17-13 17-27c0-9.4-7.6-17-17-17zm0 24a7 7 0 1 1 0-14 7 7 0 0 1 0 14z" fill="currentColor" opacity="0.92"/>
+                    <defs><radialGradient id="sG" cx="0.5" cy="0.4" r="0.7"><stop offset="0%" stop-color="%237fc5b6" stop-opacity="0.95"/><stop offset="100%" stop-color="%235a9e8f" stop-opacity="0.85"/></radialGradient><filter id="sS"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="rgba(0,0,0,0.3)"/></filter></defs><path d="M32 6C20 6 10 16 10 28c0 18 22 30 22 30s22-12 22-30C54 16 44 6 32 6zm0 22a6 6 0 1 1 0-12 6 6 0 0 1 0 12z" fill="url(%23sG)" filter="url(%23sS)"/>
                     <circle cx="18" cy="18" r="4" fill="currentColor" opacity="0.55"/>
                     <circle cx="46" cy="18" r="4" fill="currentColor" opacity="0.55"/>
                     <circle cx="20" cy="48" r="3.5" fill="currentColor" opacity="0.45"/>
@@ -4283,6 +4835,32 @@
       `;
     }
 
+    function renderBamboozle() {
+      const data = getData() || {};
+      const bam = data.bamboozle || data;
+      const image = bam.image || '';
+      const duration = bam.duration || 16;
+      const running = bam.running || false;
+      const remaining = bam.remaining !== undefined ? bam.remaining : 0;
+      const ready = !running && remaining <= 0;
+      const progress = duration > 0 ? Math.min(1, Math.max(0, remaining / duration)) : 0;
+      const circumference = 400;
+      const dashoffset = circumference * (1 - progress);
+      return `<section class="overlay-shell ov-bamboozle ${ready ? 'bam-complete' : ''}">
+          <div class="bam-container">
+            <div class="bam-ring-wrap">
+              <svg class="bam-ring-svg" viewBox="0 0 140 140" aria-hidden="true">
+                <circle cx="70" cy="70" r="64" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="5"/>
+                <circle class="bam-ring-fill" cx="70" cy="70" r="64" fill="none" stroke="var(--bam-accent, #e0543e)" stroke-width="5" stroke-linecap="round" stroke-dasharray="${circumference}" stroke-dashoffset="${dashoffset}" transform="rotate(-90 70 70)"/>
+              </svg>
+              <div class="bam-ring-icon">${image ? `<img class="bam-perk-icon" src="${image}" alt="">` : '<span style="font-size:64px">🧱</span>'}</div>
+            </div>
+            ${ready ? '<div class="bam-timer bam-ready">READY</div>' : running ? `<div class="bam-timer"><span class="bam-count${remaining <= 3 ? ' bam-warning' : ''}">${remaining.toFixed(1)}<span class="bam-unit">s</span></span></div>` : '<div class="bam-timer bam-idle">PAUSED</div>'}
+          </div>
+        </section>
+      `;
+    }
+
     function renderQueue() {
       const data = getData();
       const queue = data || {};
@@ -4332,6 +4910,9 @@
         // Store resize handles before clearing
         const resizeHandles = root.querySelectorAll('.resize-handle');
         const handlesHTML = Array.from(resizeHandles).map(h => h.outerHTML).join('');
+        // Preserve watermark
+        const wm = root.querySelector('.overlay-watermark');
+        const wmHTML = wm ? wm.outerHTML : '';
 
         let html;
         if (state.type === 'onevone') {
@@ -4343,6 +4924,7 @@
             queue: renderQueue(),
             winstreak: renderWinstreak(),
             ladder: renderLadder(),
+            bamboozle: renderBamboozle(),
           }[state.type] || `<div class="overlay-shell overlay-empty">Overlay type unavailable</div>`;
         }
 
@@ -4363,12 +4945,27 @@
           ];
           root.insertAdjacentHTML('beforeend', handles.join(''));
         }
+        // Re-insert watermark
+        if (wmHTML) {
+          root.insertAdjacentHTML('beforeend', wmHTML);
+        }
       });
       
       // after DOM is rendered, initialize controls
       initMapControls();
       initResizeHandles();
-        initDragHandle();
+      initDragHandle();
+      // Apply map crossfade on image change
+      applyMapCrossfade();
+    }
+
+    function applyMapCrossfade() {
+      const img = document.getElementById('maps-img');
+      if (!img) return;
+      img.classList.remove('map-image-enter', 'map-image-exit');
+      // Force reflow
+      void img.offsetWidth;
+      img.classList.add('map-image-enter');
     }
 
     // Perform a leave -> insert -> enter transition when re-rendering overlays
@@ -4679,6 +5276,31 @@
         document.documentElement.style.setProperty('--overlay-bg-alpha', String(v));
         updateTransparencyClass();
       } catch (e) {}
+    });
+
+    // Prevent right-click context menu in overlay so users can't get stuck in DevTools
+    document.addEventListener('contextmenu', e => e.preventDefault());
+
+    // Handle hotkey IPC directly in overlay (bypass main window if it's hidden)
+    ipcRenderer.on('hotkey', (event, scope, action) => {
+      if (scope === 'bamboozle') {
+        if (action === 'timer-start' && !bamLocal.running) {
+          bamLocal.remaining = bamLocal.duration;
+          bamLocal.running = true;
+          bamLocal.lastUpdate = performance.now();
+          startBamRaf();
+          updateBamDom();
+        } else if (action === 'timer-pause') {
+          bamLocal.running = false;
+          stopBamRaf();
+          updateBamDom();
+        } else if (action === 'timer-reset') {
+          bamLocal.running = false;
+          stopBamRaf();
+          bamLocal.remaining = 0;
+          updateBamDom();
+        }
+      }
     });
 
     // minimal boxes mode is tied to transparency: handled in updateTransparencyClass()

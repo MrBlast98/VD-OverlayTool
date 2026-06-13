@@ -53,19 +53,17 @@ try {
 let dpiScaleFactor = 1;
 const initialUiScale = Number(store.get('ui.scale', 1)) || 1;
 try {
-  document.documentElement.style.setProperty('--ui-scale', initialUiScale * dpiScaleFactor);
+  document.documentElement.style.setProperty('--ui-scale', initialUiScale);
 } catch (e) {
   // document may not be ready in some contexts; set later when DOM is available
 }
 
 function applyUiScaleToDocument(scale) {
   const userScale = Number(scale) || 1;
-  const effectiveScale = userScale * dpiScaleFactor;
   try {
-    document.documentElement.style.setProperty('--ui-scale', effectiveScale);
-    document.documentElement.style.setProperty('--dpi-scale', dpiScaleFactor);
+    document.documentElement.style.setProperty('--ui-scale', userScale);
   } catch (e) {
-    console.warn('Could not apply DPI-aware UI scale yet');
+    console.warn('Could not apply UI scale yet');
   }
   ipcRenderer.send('ui-scale-changed', userScale);
 }
@@ -1118,6 +1116,16 @@ const state = {
       clickthrough: store.get('overlay.ladder.clickthrough', true),
       backgroundAlpha: store.get('overlay.ladder.backgroundAlpha', 0.16),
     },
+    bamboozle: {
+      enabled: store.get('overlay.bamboozle.enabled', false),
+      open: false,
+      locked: store.get('overlay.bamboozle.locked', false),
+      opacity: store.get('overlay.bamboozle.opacity', 100),
+      alwaysOnTop: store.get('overlay.bamboozle.alwaysOnTop', true),
+      transparent: store.get('overlay.bamboozle.transparent', false),
+      clickthrough: store.get('overlay.bamboozle.clickthrough', true),
+      backgroundAlpha: store.get('overlay.bamboozle.backgroundAlpha', 0.16),
+    },
   },
   robloxIntegration: {
     enabled: store.get('roblox.enabled', false),
@@ -1239,6 +1247,9 @@ const state = {
     winstreakNextKiller: store.get('hotkeys.winstreakNextKiller', null),
     winstreakAlwaysOnTop: store.get('hotkeys.winstreakAlwaysOnTop', null),
     overlayClose: store.get('hotkeys.overlayClose', 'Shift+F6'),
+    bamboozleStart: store.get('hotkeys.bamboozleStart', null),
+    bamboozlePause: store.get('hotkeys.bamboozlePause', null),
+    bamboozleReset: store.get('hotkeys.bamboozleReset', null),
   },
   bg: {
     visualSrc: store.get('bg.visual', ''),
@@ -1262,6 +1273,14 @@ const state = {
     opponentDiscord: store.get('ladder.opponentDiscord', ''),
     fetchStatus: store.get('ladder.fetchStatus', ''),
   },
+    bamboozle: {
+    image: store.get('bamboozle.image', ''),
+    duration: store.get('bamboozle.duration', 16),
+    running: false,
+    remaining: 0,
+    phase: 'up',
+    timerId: null,
+  },
   startupUpdate: {
     initialized: false,
     flowActive: false,
@@ -1282,8 +1301,6 @@ const onevoneTimers = {
   1: new PreciseTimer(),
   2: new PreciseTimer(),
 };
-
-const ONEVONE_REWORKED = true;
 
 onevoneTimers[1].setElapsedMs(state.onevone.player1ElapsedMs);
 onevoneTimers[2].setElapsedMs(state.onevone.player2ElapsedMs);
@@ -2619,6 +2636,7 @@ function overlayTitle(type) {
     fourvone: 'Scrim Overlay',
     queue: 'Queue Overlay',
     winstreak: 'Winstreak Overlay',
+    bamboozle: 'Bamboozle Timer',
   }[type];
 }
 
@@ -2630,6 +2648,7 @@ function overlayDescription(type) {
     queue: 'A live queue board powered by NeatQueue.',
     winstreak: 'Killer streak board with win condition and running wins total.',
     ladder: 'Ladder overlay showing ELO, winrate and matches from Slugbot.',
+    bamboozle: 'Bamboozle perk cooldown timer — 16s window block countdown.',
   }[type];
 }
 
@@ -2641,7 +2660,7 @@ function updateStatusBar() {
     dot.className = `status-dot ${liveCount > 0 ? 'live' : ''}`;
   }
   if (info) {
-    info.textContent = `1V1 ${state.overlays.onevone.enabled ? 'EN' : 'DIS'} | MAPS ${state.overlays.maps.enabled ? 'EN' : 'DIS'} | SCR ${state.overlays.fourvone.enabled ? 'EN' : 'DIS'} | QUE ${state.overlays.queue.enabled ? 'EN' : 'DIS'} | WST ${state.overlays.winstreak.enabled ? 'EN' : 'DIS'} | LAD ${state.overlays.ladder.enabled ? 'EN' : 'DIS'}`;
+    info.textContent = `1V1 ${state.overlays.onevone.enabled ? 'EN' : 'DIS'} | MAPS ${state.overlays.maps.enabled ? 'EN' : 'DIS'} | SCR ${state.overlays.fourvone.enabled ? 'EN' : 'DIS'} | QUE ${state.overlays.queue.enabled ? 'EN' : 'DIS'} | WST ${state.overlays.winstreak.enabled ? 'EN' : 'DIS'} | LAD ${state.overlays.ladder.enabled ? 'EN' : 'DIS'} | BAM ${state.overlays.bamboozle.enabled ? 'EN' : 'DIS'}`;
   }
 }
 
@@ -2717,6 +2736,13 @@ function pushOverlayUpdate(type) {
       serverId: state.ladder.serverId,
       leaderboardId: state.ladder.leaderboardId,
       players: (state.ladder.data && state.ladder.data.players) || [],
+    },
+    bamboozle: {
+      image: state.bamboozle.image,
+      duration: state.bamboozle.duration,
+      running: state.bamboozle.running,
+      remaining: state.bamboozle.remaining,
+      phase: state.bamboozle.phase,
     },
   };
 
@@ -2958,7 +2984,6 @@ function stopLadderRefreshTimer() {
 }
 
 function startOnevoneTimer(playerNum = 1) {
-  if (ONEVONE_REWORKED) return;
   const nextPlayer = playerNum === 2 ? 2 : 1;
   state.onevone.activeTimer = nextPlayer;
   store.set('onevone.activeTimer', state.onevone.activeTimer);
@@ -2973,30 +2998,30 @@ function startOnevoneTimer(playerNum = 1) {
     timers.onevone = setInterval(() => {
       syncOnevoneTimerState();
       updateTimerDisplay('onevone');
-      pushOverlayUpdate('onevone');
-    }, 33);
+    }, 100);
   }
 
+  ipcRenderer.send('onevone-command', { command: 'start', player: nextPlayer });
   syncOnevoneTimerState();
   updateTimerDisplay('onevone');
   pushOverlayUpdate('onevone');
 }
 
 function stopOnevoneTimer() {
-  if (ONEVONE_REWORKED) return;
   clearInterval(timers.onevone);
   timers.onevone = null;
   onevoneTimers[1].pause();
   onevoneTimers[2].pause();
   state.onevone.timerRunning = false;
+  ipcRenderer.send('onevone-command', { command: 'pause' });
   syncOnevoneTimerState();
   updateTimerDisplay('onevone');
   pushOverlayUpdate('onevone');
 }
 
 function resetOnevoneTimer() {
-  if (ONEVONE_REWORKED) return;
-  stopOnevoneTimer();
+  clearInterval(timers.onevone);
+  timers.onevone = null;
   onevoneTimers[1].reset();
   onevoneTimers[2].reset();
   state.onevone.player1ElapsedMs = 0;
@@ -3005,18 +3030,19 @@ function resetOnevoneTimer() {
   state.onevone.player2Seconds = 0;
   state.onevone.player1Finished = false;
   state.onevone.player2Finished = false;
+  state.onevone.timerRunning = false;
   state.onevone.activeTimer = 1;
   store.set('onevone.player1ElapsedMs', 0);
   store.set('onevone.player2ElapsedMs', 0);
   store.set('onevone.player1Seconds', 0);
   store.set('onevone.player2Seconds', 0);
   store.set('onevone.activeTimer', 1);
+  ipcRenderer.send('onevone-command', { command: 'reset' });
   updateTimerDisplay('onevone');
   pushOverlayUpdate('onevone');
 }
 
 function switchOnevoneTimer() {
-  if (ONEVONE_REWORKED) return;
   const nextTimer = state.onevone.activeTimer === 1 ? 2 : 1;
   if (state.onevone.timerRunning) {
     onevoneTimers[state.onevone.activeTimer].pause();
@@ -3024,6 +3050,7 @@ function switchOnevoneTimer() {
   }
   state.onevone.activeTimer = nextTimer;
   store.set('onevone.activeTimer', state.onevone.activeTimer);
+  ipcRenderer.send('onevone-command', { command: 'switch' });
   syncOnevoneTimerState();
   updateTimerDisplay('onevone');
   pushOverlayUpdate('onevone');
@@ -3031,7 +3058,6 @@ function switchOnevoneTimer() {
 }
 
 function finishOnevonePlayer(playerNum) {
-  if (ONEVONE_REWORKED) return;
   const otherPlayer = playerNum === 1 ? 2 : 1;
   const playerKey = `player${playerNum}`;
   const otherPlayerKey = `player${otherPlayer}`;
@@ -3043,6 +3069,7 @@ function finishOnevonePlayer(playerNum) {
     onevoneTimers[otherPlayer].start();
     state.onevone.activeTimer = otherPlayer;
     store.set('onevone.activeTimer', state.onevone.activeTimer);
+    ipcRenderer.send('onevone-command', { command: 'finish', player: playerNum });
     syncOnevoneTimerState();
     updateTimerDisplay('onevone');
     pushOverlayUpdate('onevone');
@@ -3050,6 +3077,7 @@ function finishOnevonePlayer(playerNum) {
     return;
   }
   
+  ipcRenderer.send('onevone-command', { command: 'finish', player: playerNum });
   if (state.onevone.player1Finished && state.onevone.player2Finished) {
     stopOnevoneTimer();
   }
@@ -3532,6 +3560,10 @@ function renderMapsTab() {
           <span>Overlay locked</span>
           <label class="toggle"><input type="checkbox" id="maps-locked" ${state.overlays.maps.locked ? 'checked' : ''} ${state.overlays.maps.open ? '' : 'disabled'}><span class="toggle-track"></span></label>
         </div>
+        <div class="inline-switch-row">
+          <span>Click-through (interactive when off)</span>
+          <label class="toggle"><input type="checkbox" id="maps-clickthrough" ${state.overlays.maps.clickthrough ? 'checked' : ''} ${state.overlays.maps.open ? '' : 'disabled'}><span class="toggle-track"></span></label>
+        </div>
         <button class="btn primary full mt-12" id="btn-map-open">${state.overlays.maps.open ? 'Close Overlay' : 'Launch Overlay'}</button>
       </div>
 
@@ -3608,15 +3640,140 @@ function renderMapsTab() {
 }
 
 function renderOnevoneTab() {
+  const s = state.onevone;
+  const p1Active = s.activeTimer === 1 && s.timerRunning;
+  const p2Active = s.activeTimer === 2 && s.timerRunning;
+  const allDone = s.player1Finished && s.player2Finished;
+
+  const hotkeys = [
+    { key: 'Ctrl+Shift+1', action: 'Start timer for Player 1' },
+    { key: 'Ctrl+Shift+2', action: 'Start timer for Player 2' },
+    { key: 'Ctrl+Shift+P', action: 'Pause / Resume' },
+    { key: 'Ctrl+Shift+R', action: 'Reset timer' },
+    { key: 'Ctrl+Shift+T', action: 'Switch active player' },
+  ];
+
   return `
     <div class="tab-panel" id="tab-onevone">
-      <div class="onevone-rework-shell">
-        <div class="onevone-rework-card">
-          <div class="onevone-rework-kicker">1v1 TIMER</div>
-          <div class="onevone-rework-title">Currently being reworked.</div>
-          <div class="onevone-rework-copy">The 1v1 timer is temporarily unavailable while we rebuild the flow and visuals.</div>
-          <div class="onevone-rework-note">This placeholder stays up until the replacement is ready.</div>
+      <div class="page-title">1v1 Timer</div>
+      <div class="page-subtitle">Precision timer for 1v1 matches. Timer runs locally on the overlay at 30fps.</div>
+
+      <div class="card">
+        <div class="card-title">Players</div>
+        <div class="grid-2">
+          <div class="form-row">
+            <label>Player 1 name</label>
+            <input type="text" id="onevone-player1" maxlength="20" value="${escapeHtml(s.player1Name)}" />
+          </div>
+          <div class="form-row">
+            <label>Player 2 name</label>
+            <input type="text" id="onevone-player2" maxlength="20" value="${escapeHtml(s.player2Name)}" />
+          </div>
         </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Scores</div>
+        <div class="grid-2">
+          <div class="onevone-score-box">
+            <div class="onevone-score-label">${escapeHtml(s.player1Name || 'Player 1')}</div>
+            <div class="onevone-score-controls">
+              <button class="btn sm" id="onevone-p1-score-dec">−</button>
+              <span class="onevone-score-value" id="onevone-p1-score-val">${s.player1Score}</span>
+              <button class="btn sm" id="onevone-p1-score-inc">+</button>
+            </div>
+            <div class="onevone-done-row">
+              <label class="toggle"><input type="checkbox" id="onevone-p1-finished" ${s.player1Finished ? 'checked' : ''}><span class="toggle-track"></span></label>
+              <span class="text-sm">Finished</span>
+            </div>
+          </div>
+          <div class="onevone-score-box">
+            <div class="onevone-score-label">${escapeHtml(s.player2Name || 'Player 2')}</div>
+            <div class="onevone-score-controls">
+              <button class="btn sm" id="onevone-p2-score-dec">−</button>
+              <span class="onevone-score-value" id="onevone-p2-score-val">${s.player2Score}</span>
+              <button class="btn sm" id="onevone-p2-score-inc">+</button>
+            </div>
+            <div class="onevone-done-row">
+              <label class="toggle"><input type="checkbox" id="onevone-p2-finished" ${s.player2Finished ? 'checked' : ''}><span class="toggle-track"></span></label>
+              <span class="text-sm">Finished</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Timer</div>
+        <div class="onevone-tab-timers">
+          <div class="onevone-tab-timer ${p1Active ? 'active' : ''}">
+            <div class="onevone-tab-label">${escapeHtml(s.player1Name || 'P1')}</div>
+            <div class="onevone-tab-time" id="onevone-timer-p1">${formatMillisDynamic(s.player1ElapsedMs)}</div>
+            <div class="onevone-tab-sub">${s.player1Seconds}s</div>
+          </div>
+          <div class="onevone-tab-timer ${p2Active ? 'active' : ''}">
+            <div class="onevone-tab-label">${escapeHtml(s.player2Name || 'P2')}</div>
+            <div class="onevone-tab-time" id="onevone-timer-p2">${formatMillisDynamic(s.player2ElapsedMs)}</div>
+            <div class="onevone-tab-sub">${s.player2Seconds}s</div>
+          </div>
+        </div>
+        <div class="onevone-tab-actions">
+          <button class="btn primary" id="onevone-start">${s.timerRunning ? 'Resume' : 'Start'}</button>
+          <button class="btn secondary" id="onevone-pause" ${s.timerRunning ? '' : 'disabled'}>Pause</button>
+          <button class="btn danger" id="onevone-reset">Reset</button>
+          <button class="btn secondary" id="onevone-switch">Switch</button>
+        </div>
+        <div class="onevone-tab-status">
+          ${s.timerRunning ? `Running: ${escapeHtml(s.activeTimer === 2 ? s.player2Name : s.player1Name)}` : allDone ? 'Both finished' : 'Paused'}
+          &middot;
+          P1 ${s.player1Finished ? 'done' : 'live'} / P2 ${s.player2Finished ? 'done' : 'live'}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Hotkeys</div>
+        ${hotkeys.map(item => `
+          <div class="toggle-row hotkey-row">
+            <div>
+              <div class="toggle-label">${item.action}</div>
+            </div>
+            <span class="hotkey-tag">${item.key}</span>
+          </div>
+        `).join('')}
+      </div>
+
+      <div class="card compact-card">
+        <div class="card-title">Overlay</div>
+        <div class="form-row">
+          <label>Overlay Opacity</label>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <input type="range" id="onevone-opacity" min="0" max="100" value="${state.overlays.onevone.opacity}" style="flex: 1;" />
+            <span id="onevone-opacity-val" style="min-width: 35px; text-align: right;">${state.overlays.onevone.opacity}%</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Background Transparency</label>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <input type="range" id="onevone-bg-alpha" min="0" max="100" value="${Math.round(state.overlays.onevone.backgroundAlpha * 100)}" style="flex: 1;" />
+            <span id="onevone-bg-alpha-val" style="min-width: 35px; text-align: right;">${Math.round(state.overlays.onevone.backgroundAlpha * 100)}%</span>
+          </div>
+        </div>
+        <div class="inline-switch-row">
+          <span>1v1 overlay enabled</span>
+          <label class="toggle"><input type="checkbox" id="onevone-enabled" ${state.overlays.onevone.enabled ? 'checked' : ''}><span class="toggle-track"></span></label>
+        </div>
+        <div class="inline-switch-row">
+          <span>Overlay locked</span>
+          <label class="toggle"><input type="checkbox" id="onevone-locked" ${state.overlays.onevone.locked ? 'checked' : ''} ${state.overlays.onevone.open ? '' : 'disabled'}><span class="toggle-track"></span></label>
+        </div>
+        <div class="inline-switch-row">
+          <span>Always on top</span>
+          <label class="toggle"><input type="checkbox" id="onevone-always-on-top" ${state.overlays.onevone.alwaysOnTop ? 'checked' : ''} ${state.overlays.onevone.open ? '' : 'disabled'}><span class="toggle-track"></span></label>
+        </div>
+        <div class="inline-switch-row">
+          <span>Click-through</span>
+          <label class="toggle"><input type="checkbox" id="onevone-clickthrough" ${state.overlays.onevone.clickthrough ? 'checked' : ''} ${state.overlays.onevone.open ? '' : 'disabled'}><span class="toggle-track"></span></label>
+        </div>
+        <button class="btn primary full mt-12" id="btn-onevone-open">${state.overlays.onevone.open ? 'Close Overlay' : 'Launch Overlay'}</button>
       </div>
     </div>
   `;
@@ -5242,7 +5399,7 @@ function initTabs() {
   });
 }
 
-const _navOrder = ['dashboard','onevone','maps','fourvone','winstreak','ladder','stats','winstreak-builds','game-info','backgrounds','fonts','settings','credits'];
+const _navOrder = ['dashboard','onevone','maps','fourvone','winstreak','ladder','bamboozle','stats','winstreak-builds','game-info','backgrounds','fonts','settings','credits'];
 
 function activateTab(tab, activeButton = document.querySelector(`[data-tab="${tab}"]`)) {
   const prev = state.activeTab;
@@ -5392,8 +5549,49 @@ function bindOnevoneTab() {
     reRenderTab('onevone');
   });
 
+  // Score controls
+  function adjustScore(pnum, delta) {
+    const key = `player${pnum}Score`;
+    state.onevone[key] = Math.max(0, state.onevone[key] + delta);
+    store.set(`onevone.${key}`, state.onevone[key]);
+    pushOverlayUpdate('onevone');
+    reRenderTab('onevone');
+  }
 
-  // Score and timer action bindings removed: UI simplified to name editing and overlay appearance controls.
+  document.getElementById('onevone-p1-score-inc')?.addEventListener('click', () => adjustScore(1, 1));
+  document.getElementById('onevone-p1-score-dec')?.addEventListener('click', () => adjustScore(1, -1));
+  document.getElementById('onevone-p2-score-inc')?.addEventListener('click', () => adjustScore(2, 1));
+  document.getElementById('onevone-p2-score-dec')?.addEventListener('click', () => adjustScore(2, -1));
+
+  // Finished checkboxes
+  document.getElementById('onevone-p1-finished')?.addEventListener('change', event => {
+    if (event.target.checked) finishOnevonePlayer(1);
+    else reRenderTab('onevone');
+  });
+  document.getElementById('onevone-p2-finished')?.addEventListener('change', event => {
+    if (event.target.checked) finishOnevonePlayer(2);
+    else reRenderTab('onevone');
+  });
+
+  // Timer actions
+  document.getElementById('onevone-start')?.addEventListener('click', () => {
+    startOnevoneTimer(state.onevone.activeTimer);
+    reRenderTab('onevone');
+  });
+
+  document.getElementById('onevone-pause')?.addEventListener('click', () => {
+    stopOnevoneTimer();
+    reRenderTab('onevone');
+  });
+
+  document.getElementById('onevone-reset')?.addEventListener('click', () => {
+    resetOnevoneTimer();
+    reRenderTab('onevone');
+  });
+
+  document.getElementById('onevone-switch')?.addEventListener('click', () => {
+    switchOnevoneTimer();
+  });
 
   document.getElementById('onevone-opacity')?.addEventListener('input', event => {
     state.overlays.onevone.opacity = parseInt(event.target.value, 10);
@@ -5425,6 +5623,13 @@ function bindOnevoneTab() {
     state.overlays.onevone.locked = event.target.checked;
     store.set('overlay.onevone.locked', state.overlays.onevone.locked);
     ipcRenderer.send('toggle-overlay-lock', 'onevone', state.overlays.onevone.locked);
+  });
+
+  document.getElementById('onevone-always-on-top')?.addEventListener('change', event => {
+    if (!state.overlays.onevone.open) return;
+    state.overlays.onevone.alwaysOnTop = event.target.checked;
+    store.set('overlay.onevone.alwaysOnTop', state.overlays.onevone.alwaysOnTop);
+    ipcRenderer.send('toggle-overlay-always-on-top', 'onevone', state.overlays.onevone.alwaysOnTop);
   });
 
   document.getElementById('btn-onevone-open')?.addEventListener('click', () => {
@@ -5542,6 +5747,13 @@ function bindMapsTab() {
     state.overlays.maps.alwaysOnTop = event.target.checked;
     store.set('overlay.maps.alwaysOnTop', state.overlays.maps.alwaysOnTop);
     ipcRenderer.send('toggle-overlay-always-on-top', 'maps', state.overlays.maps.alwaysOnTop);
+  });
+
+  document.getElementById('maps-clickthrough')?.addEventListener('change', event => {
+    if (!state.overlays.maps.open) return;
+    state.overlays.maps.clickthrough = event.target.checked;
+    store.set('overlay.maps.clickthrough', state.overlays.maps.clickthrough);
+    ipcRenderer.send('toggle-overlay-clickthrough', 'maps', state.overlays.maps.clickthrough);
   });
 
   bindHotkeyInputs();
@@ -6528,6 +6740,290 @@ function toggleAudioPlayback() {
   }
 }
 
+function renderBamboozleTab() {
+  const bam = state.bamboozle;
+  return `<div class="tab-panel" id="tab-bamboozle">
+    <div class="card">
+      <h2>Bamboozle Timer</h2>
+      <p class="help-text">A ${bam.duration}-second countdown overlay for The Bamboozle perk. Upload the Bamboozle perk icon and launch the overlay — it will show the image and count down when started.</p>
+
+      <div class="overlay-controls-card">
+        <h3>Controls</h3>
+        <div class="form-group">
+          <label>Bamboozle Perk Image</label>
+          <div class="bam-image-preview" id="bam-image-preview">
+            ${bam.image ? `<img src="${bam.image}" alt="Bamboozle icon">` : '<span style="color:#888">No image selected</span>'}
+          </div>
+          <input type="file" id="bam-image-input" accept="image/*" style="margin-top:4px">
+          <button class="btn btn-sm" id="bam-clear-image" style="margin-top:4px">Clear Image</button>
+        </div>
+        <div class="form-group">
+          <label>Countdown Duration (seconds)</label>
+          <input type="number" id="bam-duration" class="form-input" value="${bam.duration}" min="1" max="120" style="width:80px">
+        </div>
+        <div class="form-group">
+          <label>Timer State</label>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-primary" id="bam-start-btn" ${bam.running ? 'disabled' : ''}>Start</button>
+            <button class="btn btn-secondary" id="bam-pause-btn" ${bam.running ? '' : 'disabled'}>Pause</button>
+            <button class="btn btn-sm" id="bam-reset-btn">Reset</button>
+            <span id="bam-status-text" style="margin-left:8px">${bam.running ? bam.remaining.toFixed(1) + 's' : bam.remaining > 0 ? 'Paused ' + bam.remaining.toFixed(1) + 's' : 'READY'}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="overlay-settings-card">
+        <h3>Overlay Settings</h3>
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="bam-enabled" ${state.overlays.bamboozle.enabled ? 'checked' : ''}>
+            Launch with overlays
+          </label>
+        </div>
+        <div class="form-group">
+          <label>Opacity</label>
+          <input type="range" id="bam-opacity" min="10" max="100" value="${state.overlays.bamboozle.opacity}">
+          <span id="bam-opacity-val">${state.overlays.bamboozle.opacity}%</span>
+        </div>
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="bam-locked" ${state.overlays.bamboozle.locked ? 'checked' : ''}>
+            Locked
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="bam-clickthrough" ${state.overlays.bamboozle.clickthrough ? 'checked' : ''}>
+            Click-through
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="bam-alwaysontop" ${state.overlays.bamboozle.alwaysOnTop ? 'checked' : ''}>
+            Always on top
+          </label>
+        </div>
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="bam-transparent" ${state.overlays.bamboozle.transparent ? 'checked' : ''}>
+            Transparent background
+          </label>
+        </div>
+        <div>
+          <button class="btn btn-primary" id="bam-launch-btn">Launch Overlay</button>
+          <button class="btn btn-sm" id="bam-close-btn">Close Overlay</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Hotkeys</div>
+        <div class="form-row">
+          <label>Start / Resume</label>
+          <input type="text" readonly data-hotkey-setting="bamboozleStart" data-hotkey-tab="bamboozle" value="${escapeHtml(getHotkey('bamboozleStart'))}" placeholder="Press a shortcut" />
+        </div>
+        <div class="form-row">
+          <label>Pause</label>
+          <input type="text" readonly data-hotkey-setting="bamboozlePause" data-hotkey-tab="bamboozle" value="${escapeHtml(getHotkey('bamboozlePause'))}" placeholder="Press a shortcut" />
+        </div>
+        <div class="form-row">
+          <label>Reset</label>
+          <input type="text" readonly data-hotkey-setting="bamboozleReset" data-hotkey-tab="bamboozle" value="${escapeHtml(getHotkey('bamboozleReset'))}" placeholder="Press a shortcut" />
+        </div>
+        <div class="text-sm mt-8">Click any field and press a new shortcut. Backspace clears the binding.</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function bindBamboozleTab() {
+  const bam = state.bamboozle;
+
+  function updateStatusLine() {
+    const st = document.getElementById('bam-status-text');
+    if (!st) return;
+    if (bam.running) {
+      st.textContent = bam.remaining.toFixed(1) + 's';
+    } else if (bam.remaining > 0) {
+      st.textContent = 'Paused ' + bam.remaining.toFixed(1) + 's';
+    } else {
+      st.textContent = 'READY';
+    }
+  }
+
+  function updateBamBtns() {
+    const sb = document.getElementById('bam-start-btn');
+    const pb = document.getElementById('bam-pause-btn');
+    if (sb) sb.disabled = bam.running;
+    if (pb) pb.disabled = !bam.running;
+  }
+
+  window.__bamStart = function() {
+    if (bam.running) return;
+    if (bam.remaining <= 0) {
+      bam.remaining = bam.duration;
+    }
+    bam.running = true;
+    updateBamBtns();
+    pushOverlayUpdate('bamboozle');
+    ipcRenderer.send('bamboozle-command', { action: 'start', remaining: bam.remaining, duration: bam.duration, image: bam.image });
+    const tick = 0.05;
+    bam.timerId = setInterval(() => {
+      bam.remaining = Math.max(0, bam.remaining - tick);
+      updateStatusLine();
+      if (bam.remaining <= 0) {
+        bam.running = false;
+        if (bam.timerId) { clearInterval(bam.timerId); bam.timerId = null; }
+        updateBamBtns();
+        updateStatusLine();
+        pushOverlayUpdate('bamboozle');
+        ipcRenderer.send('bamboozle-command', { action: 'complete' });
+      }
+    }, 50);
+  };
+
+  window.__bamPause = function() {
+    bam.running = false;
+    if (bam.timerId) { clearInterval(bam.timerId); bam.timerId = null; }
+    updateBamBtns();
+    updateStatusLine();
+    ipcRenderer.send('bamboozle-command', { action: 'pause', remaining: bam.remaining });
+  };
+
+  window.__bamReset = function() {
+    window.__bamPause();
+    bam.remaining = 0;
+    updateStatusLine();
+    pushOverlayUpdate('bamboozle');
+    ipcRenderer.send('bamboozle-command', { action: 'reset' });
+  };
+
+  function startTimer() { window.__bamStart(); }
+  function pauseTimer() { window.__bamPause(); }
+
+  // Image upload
+  const imgInput = document.getElementById('bam-image-input');
+  if (imgInput) {
+    imgInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        bam.image = ev.target.result;
+        store.set('bamboozle.image', bam.image);
+        const preview = document.getElementById('bam-image-preview');
+        if (preview) preview.innerHTML = `<img src="${bam.image}" alt="Bamboozle icon">`;
+        pushOverlayUpdate('bamboozle');
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Clear image
+  const clearBtn = document.getElementById('bam-clear-image');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      bam.image = '';
+      store.set('bamboozle.image', '');
+      const preview = document.getElementById('bam-image-preview');
+      if (preview) preview.innerHTML = '<span style="color:#888">No image selected</span>';
+      const fi = document.getElementById('bam-image-input');
+      if (fi) fi.value = '';
+    });
+  }
+
+  // Duration
+  const durInput = document.getElementById('bam-duration');
+  if (durInput) {
+    durInput.addEventListener('change', () => {
+      bam.duration = Math.max(1, parseInt(durInput.value) || 16);
+      store.set('bamboozle.duration', bam.duration);
+    });
+  }
+
+  // Start
+  const startBtn = document.getElementById('bam-start-btn');
+  if (startBtn) {
+    startBtn.addEventListener('click', () => {
+      startTimer();
+    });
+  }
+
+  // Pause
+  const pauseBtn = document.getElementById('bam-pause-btn');
+  if (pauseBtn) {
+    pauseBtn.addEventListener('click', () => {
+      pauseTimer();
+    });
+  }
+
+  // Reset
+  const resetBtn = document.getElementById('bam-reset-btn');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', window.__bamReset);
+  }
+
+  // Overlay controls
+  const enabledChk = document.getElementById('bam-enabled');
+  if (enabledChk) {
+    enabledChk.addEventListener('change', () => {
+      state.overlays.bamboozle.enabled = enabledChk.checked;
+      store.set('overlay.bamboozle.enabled', enabledChk.checked);
+      updateStatusBar();
+    });
+  }
+
+  const opacitySlider = document.getElementById('bam-opacity');
+  if (opacitySlider) {
+    opacitySlider.addEventListener('input', () => {
+      state.overlays.bamboozle.opacity = parseInt(opacitySlider.value);
+      store.set('overlay.bamboozle.opacity', state.overlays.bamboozle.opacity);
+      document.getElementById('bam-opacity-val').textContent = opacitySlider.value + '%';
+      const ov = ipcRenderer.send('update-overlay-opacity', 'bamboozle', state.overlays.bamboozle.opacity);
+    });
+  }
+
+  const lockedChk = document.getElementById('bam-locked');
+  if (lockedChk) {
+    lockedChk.addEventListener('change', () => {
+      state.overlays.bamboozle.locked = lockedChk.checked;
+      store.set('overlay.bamboozle.locked', lockedChk.checked);
+      ipcRenderer.send('toggle-overlay-lock', 'bamboozle', lockedChk.checked);
+    });
+  }
+
+  const clickthroughChk = document.getElementById('bam-clickthrough');
+  if (clickthroughChk) {
+    clickthroughChk.addEventListener('change', () => {
+      state.overlays.bamboozle.clickthrough = clickthroughChk.checked;
+      store.set('overlay.bamboozle.clickthrough', clickthroughChk.checked);
+      ipcRenderer.send('toggle-overlay-clickthrough', 'bamboozle', clickthroughChk.checked);
+    });
+  }
+
+  const aotChk = document.getElementById('bam-alwaysontop');
+  if (aotChk) {
+    aotChk.addEventListener('change', () => {
+      state.overlays.bamboozle.alwaysOnTop = aotChk.checked;
+      store.set('overlay.bamboozle.alwaysOnTop', aotChk.checked);
+      ipcRenderer.send('toggle-overlay-always-on-top', 'bamboozle', aotChk.checked);
+    });
+  }
+
+  const transparentChk = document.getElementById('bam-transparent');
+  if (transparentChk) {
+    transparentChk.addEventListener('change', () => {
+      state.overlays.bamboozle.transparent = transparentChk.checked;
+      store.set('overlay.bamboozle.transparent', transparentChk.checked);
+      ipcRenderer.send('toggle-overlay-transparent', 'bamboozle', transparentChk.checked);
+    });
+  }
+
+  document.getElementById('bam-launch-btn')?.addEventListener('click', () => {
+    ipcRenderer.send('open-overlay', 'bamboozle');
+    setTimeout(() => pushOverlayUpdate('bamboozle'), 300);
+  });
+
+  document.getElementById('bam-close-btn')?.addEventListener('click', () => {
+    ipcRenderer.send('close-overlay', 'bamboozle');
+  });
+}
+
 function bindFontsTab() {
   document.querySelectorAll('[data-font]').forEach(card => {
     card.addEventListener('click', () => {
@@ -6583,6 +7079,7 @@ const TAB_RENDERERS = {
   backgrounds: renderBgTab,
   fonts: renderFontsTab,
   settings: renderSettingsTab,
+  bamboozle: renderBamboozleTab,
 };
 
 const TAB_BINDERS = {
@@ -6606,6 +7103,7 @@ const TAB_BINDERS = {
   backgrounds: bindBgTab,
   fonts: bindFontsTab,
   settings: bindSettingsTab,
+  bamboozle: bindBamboozleTab,
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -6840,6 +7338,15 @@ ipcRenderer.on('hotkey', (event, scope, action) => {
       toggleAlwaysOnTop('onevone');
       return;
     }
+    return;
+  }
+
+  if (scope === 'bamboozle') {
+    if (action === 'timer-start') {
+      if (state.overlays.bamboozle.enabled) openOverlay('bamboozle');
+      window.__bamStart();
+    } else if (action === 'timer-pause') window.__bamPause();
+    else if (action === 'timer-reset') window.__bamReset();
     return;
   }
 
@@ -7314,8 +7821,343 @@ function initPolishFeatures() {
   });
 }
 
+// --- 18. Global search bar ---
+function initGlobalSearch() {
+  const input = document.getElementById('global-search-input');
+  const dropdown = document.getElementById('global-search-results');
+  if (!input || !dropdown) return;
+
+  const searchableItems = [
+    // Tabs
+    { label: 'Dashboard', cat: 'tab', icon: '◌', tab: 'dashboard' },
+    { label: '1v1 Timer', cat: 'tab', icon: '⚔', tab: 'onevone' },
+    { label: 'Map Overlay', cat: 'tab', icon: '🗺', tab: 'maps' },
+    { label: 'Scrim Overlay', cat: 'tab', icon: '⚡', tab: 'fourvone' },
+    { label: 'Winstreak Overlay', cat: 'tab', icon: '◍', tab: 'winstreak' },
+    { label: 'Ladder Overlay', cat: 'tab', icon: '★', tab: 'ladder' },
+    { label: 'Winstreak Stats', cat: 'tab', icon: '◍', tab: 'stats' },
+    { label: 'Winstreak Builds', cat: 'tab', icon: '✦', tab: 'winstreak-builds' },
+    { label: 'Wiki', cat: 'tab', icon: '✦', tab: 'game-info' },
+    { label: 'Backgrounds', cat: 'tab', icon: '◧', tab: 'backgrounds' },
+    { label: 'Fonts', cat: 'tab', icon: 'Aa', tab: 'fonts' },
+    { label: 'Settings', cat: 'tab', icon: '⚙', tab: 'settings' },
+    { label: 'Credits', cat: 'tab', icon: '✦', tab: 'credits' },
+    // Settings items
+    { label: 'Overlay Settings', cat: 'setting', icon: '⚙', tab: 'settings' },
+    { label: 'Hotkey Bindings', cat: 'setting', icon: '⌨', tab: 'settings' },
+    { label: 'Theme Options', cat: 'setting', icon: '◧', tab: 'backgrounds' },
+    { label: 'Font Settings', cat: 'setting', icon: 'Aa', tab: 'fonts' },
+    // Actions
+    { label: 'Toggle Sidebar', cat: 'action', icon: '≡', action: 'toggleSidebar' },
+    { label: 'Open Command Palette', cat: 'action', icon: '⌨', action: 'openCommandPalette' },
+    { label: 'Clear All Builds', cat: 'action', icon: '✕', action: 'clearBuilds' },
+  ];
+
+  let selectedIdx = -1;
+
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    if (!q) { dropdown.classList.remove('open'); return; }
+    const results = searchableItems.filter(item =>
+      item.label.toLowerCase().includes(q) || item.cat.includes(q)
+    );
+    if (!results.length) {
+      dropdown.innerHTML = '<div class="global-search-empty">No results found</div>';
+      dropdown.classList.add('open');
+      selectedIdx = -1;
+      return;
+    }
+    dropdown.innerHTML = results.map((item, i) =>
+      `<div class="global-search-item${i === 0 ? ' selected' : ''}" data-idx="${i}" data-tab="${item.tab || ''}" data-action="${item.action || ''}">
+        <span class="gs-icon">${item.icon}</span>
+        <span>${escapeHtml(item.label)}</span>
+        <span class="gs-category">${item.cat}</span>
+      </div>`
+    ).join('');
+    dropdown.classList.add('open');
+    selectedIdx = 0;
+  });
+
+  input.addEventListener('keydown', (e) => {
+    const items = dropdown.querySelectorAll('.global-search-item');
+    if (!items.length) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); selectedIdx = Math.min(selectedIdx + 1, items.length - 1); updateSearchSelection(items); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); selectedIdx = Math.max(selectedIdx - 1, 0); updateSearchSelection(items); }
+    if (e.key === 'Enter' && selectedIdx > -1) { e.preventDefault(); activateSearchItem(items[selectedIdx]); }
+    if (e.key === 'Escape') { dropdown.classList.remove('open'); input.blur(); }
+  });
+
+  dropdown.addEventListener('click', (e) => {
+    const item = e.target.closest('.global-search-item');
+    if (item) activateSearchItem(item);
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#global-search-wrap')) dropdown.classList.remove('open');
+  });
+
+  function updateSearchSelection(items) {
+    items.forEach((el, i) => el.classList.toggle('selected', i === selectedIdx));
+    items[selectedIdx]?.scrollIntoView({ block: 'nearest' });
+  }
+
+  function activateSearchItem(el) {
+    const tab = el.dataset.tab;
+    const action = el.dataset.action;
+    dropdown.classList.remove('open');
+    input.value = '';
+    if (action === 'toggleSidebar') { toggleSidebar(); return; }
+    if (action === 'openCommandPalette') { openCommandPalette?.(); return; }
+    if (action === 'clearBuilds') { clearAllWinstreakBuilds?.(); return; }
+    if (tab) activateTab(tab);
+  }
+}
+
+// --- 19. Context menu system ---
+function initContextMenu() {
+  const menu = document.getElementById('context-menu');
+  if (!menu) return;
+  document.addEventListener('contextmenu', (e) => {
+    // Check if right-clicking on a build card or other actionable element
+    const buildCard = e.target.closest('.build-card, .winstreak-build-card');
+    if (buildCard) {
+      e.preventDefault();
+      showContextMenu(e.clientX, e.clientY, buildCard);
+    }
+  });
+  document.addEventListener('click', (e) => {
+    if (!menu.classList.contains('open')) return;
+    if (!e.target.closest('.context-menu')) {
+      menu.classList.remove('open');
+    }
+  });
+}
+function showContextMenu(x, y, target) {
+  const menu = document.getElementById('context-menu');
+  if (!menu) return;
+  menu.innerHTML = '';
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+  const items = [
+    { label: 'Edit Build', icon: '✎', action: () => { /* tab switch to builds */ } },
+    { label: 'Duplicate', icon: '⧉', action: () => { /* duplicate logic */ } },
+    { label: 'Share', icon: '↗', action: () => { /* share logic */ } },
+    { type: 'separator' },
+    { label: 'Delete', icon: '✕', className: 'danger', action: () => { /* delete logic */ } },
+  ];
+  items.forEach(item => {
+    if (item.type === 'separator') {
+      const sep = document.createElement('div');
+      sep.className = 'context-menu-separator';
+      menu.appendChild(sep);
+      return;
+    }
+    const el = document.createElement('div');
+    el.className = 'context-menu-item' + (item.className ? ' ' + item.className : '');
+    el.innerHTML = `<span>${item.icon || ''}</span><span>${item.label}</span>`;
+    el.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      menu.classList.remove('open');
+      if (item.action) item.action();
+    });
+    menu.appendChild(el);
+  });
+  menu.classList.add('open');
+}
+
+// --- 19. Quick toolbar ---
+function initQuickToolbar() {
+  const toolbar = document.getElementById('quick-toolbar');
+  if (!toolbar) return;
+  // Quick toolbar will be shown/hidden by tab-specific logic
+}
+
+// --- 20. Offline indicator ---
+function initOfflineIndicator() {
+  const el = document.getElementById('offline-indicator');
+  if (!el) return;
+  window.addEventListener('online', () => el.classList.remove('show'));
+  window.addEventListener('offline', () => el.classList.add('show'));
+  if (!navigator.onLine) el.classList.add('show');
+}
+
+// --- 21. Memory display (periodic update) ---
+function initMemoryDisplay() {
+  const container = document.querySelector('.memory-display');
+  if (!container) return;
+  function updateMemory() {
+    if (window.process && window.process.getProcessMemoryInfo) {
+      window.process.getProcessMemoryInfo().then(info => {
+        const mb = (info.privateBytes / 1024 / 1024).toFixed(1);
+        container.textContent = `${mb} MB`;
+      }).catch(() => {});
+    }
+  }
+  updateMemory();
+  setInterval(updateMemory, 30000);
+}
+
+// --- 22. Notification sound toggle ---
+function initNotificationSoundToggle() {
+  const toggle = document.querySelector('.sound-toggle');
+  if (!toggle) return;
+  toggle.addEventListener('click', () => {
+    const enabled = toggle.dataset.enabled !== 'false';
+    const next = !enabled;
+    toggle.dataset.enabled = String(next);
+    toggle.querySelector('.sound-icon').textContent = next ? '🔔' : '🔕';
+    store.set('notification-sound', next);
+  });
+}
+
+// --- 23. Accent picker ---
+function initAccentPicker() {
+  const wrap = document.querySelector('.accent-picker-wrap');
+  if (!wrap) return;
+  const swatches = wrap.querySelectorAll('.accent-swatch');
+  swatches.forEach(swatch => {
+    swatch.addEventListener('click', () => {
+      swatches.forEach(s => s.classList.remove('active'));
+      swatch.classList.add('active');
+      const color = swatch.dataset.color || '#7f95ff';
+      document.documentElement.style.setProperty('--accent', color);
+      store.set('accent-color', color);
+    });
+  });
+}
+
+// --- 24. Font preview cards ---
+function initFontPreview() {
+  document.querySelectorAll('.font-preview-card').forEach(card => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.font-preview-card').forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+      const font = card.dataset.font || 'Inter';
+      document.documentElement.style.setProperty('--font-body', font);
+      store.set('font-family', font);
+    });
+  });
+}
+
+// --- 25. Wallpaper picker ---
+function initWallpaperPicker() {
+  const inputs = document.querySelectorAll('.wallpaper-picker input[type="file"]');
+  inputs.forEach(input => {
+    input.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target.result;
+        document.documentElement.style.setProperty('--wallpaper', `url("${dataUrl}")`);
+        store.set('wallpaper', dataUrl);
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+}
+
+// --- 26. Scheduled tasks UI ---
+function initScheduledTasks() {
+  document.querySelectorAll('.scheduled-task .st-toggle').forEach(toggle => {
+    toggle.addEventListener('change', (e) => {
+      const task = e.target.closest('.scheduled-task');
+      if (!task) return;
+      const taskId = task.dataset.taskId;
+      if (taskId) {
+        store.set(`scheduled-task-${taskId}`, e.target.checked);
+      }
+    });
+  });
+}
+
+// --- 27. Drag-drop for build cards ---
+function initDragDrop() {
+  document.addEventListener('dragstart', (e) => {
+    const card = e.target.closest('.build-card, .winstreak-build-card');
+    if (!card) return;
+    card.classList.add('drag-ghost');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', card.dataset.buildId || '');
+  });
+  document.addEventListener('dragend', (e) => {
+    const card = e.target.closest('.build-card, .winstreak-build-card');
+    if (card) card.classList.remove('drag-ghost');
+  });
+  document.addEventListener('dragover', (e) => {
+    const dropZone = e.target.closest('.build-drop-zone');
+    if (dropZone) {
+      e.preventDefault();
+      dropZone.classList.add('drag-over');
+    }
+  });
+  document.addEventListener('dragleave', (e) => {
+    const dropZone = e.target.closest('.build-drop-zone');
+    if (dropZone) dropZone.classList.remove('drag-over');
+  });
+  document.addEventListener('drop', (e) => {
+    const dropZone = e.target.closest('.build-drop-zone');
+    if (!dropZone) return;
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const buildId = e.dataTransfer.getData('text/plain');
+    if (buildId) {
+      const builds = store.get('winstreak.builds', []);
+      const idx = builds.findIndex(b => b.id === buildId);
+      if (idx > -1) {
+        const [item] = builds.splice(idx, 1);
+        const dropIdx = Number(dropZone.dataset.index || builds.length);
+        builds.splice(dropIdx, 0, item);
+        store.set('winstreak.builds', builds);
+      }
+    }
+  });
+}
+
+// --- 28. Init all additional features ---
+// Theme switching (light, dark, hc, amoled)
+function setAppTheme(theme) {
+  const valid = ['dark', 'light', 'hc', 'amoled', 'cbf'];
+  if (!valid.includes(theme)) theme = 'dark';
+  document.body.className = document.body.className
+    .split(' ').filter(c => !c.startsWith('theme-')).join(' ');
+  if (theme !== 'dark') document.body.classList.add('theme-' + theme);
+  store.set('ui.theme', theme);
+  if (typeof reRenderTab === 'function') reRenderTab('settings');
+}
+
+// Toggle sidebar collapsed state
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  if (!sidebar) return;
+  sidebar.classList.toggle('collapsed');
+  store.set('sidebar.collapsed', sidebar.classList.contains('collapsed'));
+}
+
+// Clear all winstreak builds
+function clearAllWinstreakBuilds() {
+  if (!confirm('Clear all winstreak builds?')) return;
+  state.winstreakBuilds = [];
+  store.set('winstreak.builds', []);
+  if (typeof reRenderTab === 'function') reRenderTab('winstreak-builds');
+}
+
+function initAdditionalFeatures() {
+  initGlobalSearch();
+  initContextMenu();
+  initQuickToolbar();
+  initOfflineIndicator();
+  initMemoryDisplay();
+  initNotificationSoundToggle();
+  initAccentPicker();
+  initFontPreview();
+  initWallpaperPicker();
+  initScheduledTasks();
+  initDragDrop();
+}
+
 // Init polish after original DOMContentLoaded runs
 document.addEventListener('DOMContentLoaded', () => {
-  // Let original init finish (renderAllTabs, initSidebarGroups, etc.)
   setTimeout(initPolishFeatures, 150);
+  setTimeout(initAdditionalFeatures, 300);
 }, { once: true });

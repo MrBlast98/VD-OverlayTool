@@ -16,6 +16,10 @@
       <span class="app-name">VD OverlayTools</span>
       <span class="app-tagline">An app designed to make your competitive experience easier.</span>
     </div>
+    <div id="global-search-wrap">
+      <input id="global-search-input" type="text" placeholder="Search tabs, settings, builds...  ⌘K" autocomplete="off" spellcheck="false" />
+      <div id="global-search-results" class="global-search-dropdown"></div>
+    </div>
     <div id="titlebar-controls">
       <button onclick="window.ipc.send('minimize-window')" class="tb-btn">─</button>
       <button onclick="window.ipc.send('maximize-window')" class="tb-btn">□</button>
@@ -194,6 +198,19 @@
       <section class="nav-group">
         <button class="nav-group-header" type="button">
           <span>
+            <span class="nav-group-icon">⏱</span>
+            Timers
+          </span>
+          <span class="nav-chevron">⌄</span>
+        </button>
+        <div class="nav-group-body">
+          <button class="nav-btn" data-tab="bamboozle"><span class="nav-icon">🧱</span>Bamboozle</button>
+        </div>
+      </section>
+
+      <section class="nav-group">
+        <button class="nav-group-header" type="button">
+          <span>
             <span class="nav-group-icon">⚙</span>
             Settings
           </span>
@@ -209,6 +226,23 @@
     <main id="content">
       <!-- Tabs injected by JS -->
     </main>
+  </div>
+
+  <!-- Context menu container -->
+  <div id="context-menu" class="context-menu"></div>
+
+  <!-- Offline indicator -->
+  <div id="offline-indicator" class="offline-indicator">
+    <span class="dot"></span>
+    Offline
+  </div>
+
+  <!-- Quick toolbar -->
+  <div id="quick-toolbar" class="quick-toolbar" style="display:none"></div>
+
+  <!-- Build comparison overlay -->
+  <div id="compare-overlay" class="compare-overlay">
+    <div class="compare-panel" id="compare-panel"></div>
   </div>
 
   <script src="app.bundle.js"></script>
