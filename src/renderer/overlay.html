@@ -516,6 +516,9 @@
       justify-content: center;
       z-index: 1;
       overflow: hidden;
+    }
+
+    .bam-running .bam-ring-icon {
       animation: bamIconPulse 2s ease-in-out infinite;
     }
 
@@ -3856,21 +3859,26 @@
     function startBamRaf() {
       if (bamLocal.rafId) return;
       bamLocal.lastUpdate = performance.now();
-      function tick() {
+      bamLocal._lastFrame = 0;
+      const FRAME_MS = 1000 / 30;
+      function tick(ts) {
+        bamLocal.rafId = requestAnimationFrame(tick);
         const now = performance.now();
         const dt = (now - bamLocal.lastUpdate) / 1000;
         bamLocal.lastUpdate = now;
         bamLocal.remaining = Math.max(0, bamLocal.remaining - dt);
-        updateBamDom();
+        if (ts - bamLocal._lastFrame >= FRAME_MS) {
+          bamLocal._lastFrame = ts;
+          updateBamDom();
+        }
         if (bamLocal.remaining <= 0) {
           bamLocal.running = false;
           stopBamRaf();
           updateBamDom();
-        } else {
-          bamLocal.rafId = requestAnimationFrame(tick);
         }
       }
       bamLocal.rafId = requestAnimationFrame(tick);
+      updateBamDom();
     }
 
     function stopBamRaf() {
@@ -3913,6 +3921,7 @@
         }
       }
       section.classList.toggle('bam-complete', ready);
+      section.classList.toggle('bam-running', bamLocal.running);
     }
 
     ipcRenderer.on('bamboozle-command', (event, cmd) => {
@@ -4221,14 +4230,21 @@
       }
     }
 
-    function onevoneTick() {
+    const ONEVONE_FPS = 30;
+    const onevoneFrameInterval = 1000 / ONEVONE_FPS;
+
+    function onevoneTick(ts) {
       if (!onevoneLocal.timerRunning) return;
-      updateOnevoneDom();
+      if (ts - onevoneLocal._lastFrame >= onevoneFrameInterval) {
+        onevoneLocal._lastFrame = ts;
+        updateOnevoneDom();
+      }
       onevoneLocal.rafId = requestAnimationFrame(onevoneTick);
     }
 
     function startOnevoneLoop() {
       if (onevoneLocal.rafId) cancelAnimationFrame(onevoneLocal.rafId);
+      onevoneLocal._lastFrame = 0;
       onevoneLocal.rafId = requestAnimationFrame(onevoneTick);
     }
 

@@ -1217,9 +1217,14 @@ function createMainWindow() {
 
   mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
 
-  mainWindow.webContents.once('did-finish-load', () => syncWindowDpiScale(mainWindow));
+  mainWindow.webContents.once('did-finish-load', () => {
+    syncWindowDpiScale(mainWindow);
+    try { mainWindow.webContents.setFrameRate(60); } catch (e) {}
+  });
   mainWindow.on('move', () => syncWindowDpiScale(mainWindow));
   mainWindow.on('resize', () => syncWindowDpiScale(mainWindow));
+  mainWindow.on('focus', () => { try { mainWindow.webContents.setFrameRate(60); } catch (e) {} });
+  mainWindow.on('blur', () => { try { mainWindow.webContents.setFrameRate(15); } catch (e) {} });
 
   // Hotkeys are managed via IPC suspend/resume from renderer input field handling
   // When the app window loses complete focus (unfocused), keep hotkeys active
@@ -1288,6 +1293,7 @@ function createOverlayWindow(type) {
   });
   overlayWindow.webContents.once('did-finish-load', () => {
     broadcastOverlayState(type);
+    try { overlayWindow.webContents.setFrameRate(30); } catch (e) { /* not supported on this Electron */ }
     setTimeout(() => {
       if (!overlayWindow.isDestroyed() && !overlayWindow.isVisible()) {
         overlayWindow.showInactive();
